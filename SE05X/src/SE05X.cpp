@@ -70,9 +70,17 @@
 
 #define SE05X_SHA256_LENGTH              32
 
+#define SE05X_OEAP_SHA_256_OVERHEAD ((SE05X_SHA256_LENGTH * 2) + 2)
+
+#define SE05X_MIN_SIGNATURE_LENGTH       128    //Min length for RSA Signatures
+
+#define SE05X_MAX_SIGNATURE_LENGTH       512    //Max length for RSA Signatures
+
 #define SE05X_TEMP_OBJECT                9999
 
 #define SE05X_MAX_CHUNK_SIZE             100
+
+#define SE05X_RSA_PUBLIC_EXPONENT_SIZE   4
 
 static const byte ecc_der_header_nist256[SE05X_EC_KEY_DER_HEADER_LENGTH] =
 {
@@ -81,6 +89,39 @@ static const byte ecc_der_header_nist256[SE05X_EC_KEY_DER_HEADER_LENGTH] =
     0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03,
     0x42, 0x00
 };
+
+/* RSA Header */
+const uint8_t grsa512PubHeader[] = {0x30, 0x5C, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D,
+    0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x4B, 0x00, 0x30, 0x48, 0x02};
+
+const uint8_t grsa1kPubHeader[] = {0x30, 0x81, 0x9F, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D,
+   0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x81, 0x8D, 0x00, 0x30, 0x81, 0x89, 0x02};
+
+const uint8_t grsa1152PubHeader[] = {0x30, 0x81, 0xAF, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D,
+     0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x81, 0x9D, 0x00, 0x30, 0x81, 0x99, 0x02};
+
+const uint8_t grsa2kPubHeader[]
+= {0x30, 0x82, 0x01, 0x22, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01,
+0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x0F, 0x00, 0x30, 0x82, 0x01, 0x0A, 0x02};
+
+const uint8_t grsa3kPubHeader[]
+= {0x30, 0x82, 0x01, 0xA2, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01,
+0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x01, 0x8F, 0x00, 0x30, 0x82, 0x01, 0x8A, 0x02};
+
+const uint8_t grsa4kPubHeader[]
+= {0x30, 0x82, 0x02, 0x22, 0x30, 0x0D, 0x06, 0x09, 0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01,
+0x01, 0x01, 0x05, 0x00, 0x03, 0x82, 0x02, 0x0F, 0x00, 0x30, 0x82, 0x02, 0x0A, 0x02};
+
+/* RSA Helper Macros to make code little more readable */
+#define SE05X_RSA_NO_p /* Skip */ NULL, 0
+#define SE05X_RSA_NO_q /* Skip */ NULL, 0
+#define SE05X_RSA_NO_dp /* Skip */ NULL, 0
+#define SE05X_RSA_NO_dq /* Skip */ NULL, 0
+#define SE05X_RSA_NO_qInv /* Skip */ NULL, 0
+#define SE05X_RSA_NO_pubExp /* Skip */ NULL, 0
+#define SE05X_RSA_NO_priv /* Skip */ NULL, 0
+#define SE05X_RSA_NO_pubMod /* Skip */ NULL, 0
+
 
 SE05XClass::SE05XClass() { }
 SE05XClass::~SE05XClass() { }
@@ -253,6 +294,499 @@ int SE05XClass::generatePrivateKey(int keyID, byte publicKey[])
     /* To User: copy only 64 bytes of X Y points */
     memcpy(publicKey, &keyBuf[SE05X_EC_KEY_FORMAT_LENGTH], SE05X_EC_KEY_RAW_LENGTH);
 
+
+    return 1;
+}
+
+int SE05XClass::generatePrivateRSAKey(int keyID, byte keyBuf[], size_t keyBufMaxLen, size_t* keyLen, uint16_t keyBitLength)
+{
+    int index = 0;
+    uint8_t modulus[520] = {0};
+    uint8_t exponent[4]  = {0};
+    size_t  modlen       = sizeof(modulus);
+    size_t  pubExplen    = sizeof(exponent);
+
+    ENSURE_OR_RETURN_ON_ERROR(keyBuf != NULL, 0);
+
+    /* Copy header */
+    if (keyBitLength == kSE05x_RSABitLength_512)
+    {
+        ENSURE_OR_RETURN_ON_ERROR((sizeof(grsa512PubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U) <= keyBufMaxLen, 0);
+        memcpy(keyBuf, grsa512PubHeader, sizeof(grsa512PubHeader));
+        index += sizeof(grsa512PubHeader);
+        *keyLen = sizeof(grsa512PubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U;
+    }
+    else if (keyBitLength == kSE05x_RSABitLength_1024)
+    {
+        ENSURE_OR_RETURN_ON_ERROR((sizeof(grsa1kPubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U) <= keyBufMaxLen, 0);
+        memcpy(keyBuf, grsa1kPubHeader, sizeof(grsa1kPubHeader));
+        index += sizeof(grsa1kPubHeader);
+        *keyLen = sizeof(grsa1kPubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U;
+    }
+    else if (keyBitLength == kSE05x_RSABitLength_1152)
+    {
+        ENSURE_OR_RETURN_ON_ERROR((sizeof(grsa1152PubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U) <= keyBufMaxLen, 0);
+        memcpy(keyBuf, grsa1152PubHeader, sizeof(grsa1152PubHeader));
+        index += sizeof(grsa1152PubHeader);
+        *keyLen = sizeof(grsa1152PubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U;
+    }
+    else if (keyBitLength == kSE05x_RSABitLength_2048)
+    {
+        ENSURE_OR_RETURN_ON_ERROR((sizeof(grsa2kPubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U) <= keyBufMaxLen, 0);
+        memcpy(keyBuf, grsa2kPubHeader, sizeof(grsa2kPubHeader));
+        index += sizeof(grsa2kPubHeader);
+        *keyLen = sizeof(grsa2kPubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U;
+    }
+    else if (keyBitLength == kSE05x_RSABitLength_3072)
+    {
+        ENSURE_OR_RETURN_ON_ERROR((sizeof(grsa3kPubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U) <= keyBufMaxLen, 0);
+        memcpy(keyBuf, grsa3kPubHeader, sizeof(grsa3kPubHeader));
+        index += sizeof(grsa3kPubHeader);
+        *keyLen = sizeof(grsa3kPubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U;
+    }
+    else if (keyBitLength == kSE05x_RSABitLength_4096)
+    {
+        ENSURE_OR_RETURN_ON_ERROR((sizeof(grsa4kPubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U) <= keyBufMaxLen, 0);
+        memcpy(keyBuf, grsa4kPubHeader, sizeof(grsa4kPubHeader));
+        index += sizeof(grsa4kPubHeader);
+        *keyLen = sizeof(grsa4kPubHeader) + (keyBitLength / 8) + SE05X_RSA_PUBLIC_EXPONENT_SIZE + 3U + 3U;
+    }
+    else
+    {
+        SMLOG_E("Error in generatePrivateRSAKey keyBitLength \n");
+        return 0;
+    }
+
+    /* Add mod and exponent */
+    if (generatePrivateRSAKey(keyID, modulus, &modlen, exponent, &pubExplen, keyBitLength) != 1)
+    {
+        return 0;
+    }
+
+    size_t intModLEn = modlen + 1;  // RSA Key has null byte before moduls start
+
+    // add length for modulus
+    if(intModLEn < 0x7f)
+    {
+        ENSURE_OR_RETURN_ON_ERROR(index + 1 <= *keyLen, 0);
+        keyBuf[index++] = (uint8_t) intModLEn;
+    }
+    else if (intModLEn < 0xFF)
+    {
+        ENSURE_OR_RETURN_ON_ERROR(index + 2 <= *keyLen, 0);
+        keyBuf[index++] = 0x81;
+        keyBuf[index++] = (uint8_t) intModLEn;
+    }
+    else
+    {
+        ENSURE_OR_RETURN_ON_ERROR(index + 3 <= *keyLen, 0);
+        ENSURE_OR_RETURN_ON_ERROR((intModLEn >> 8) <= UINT8_MAX, 0);
+        keyBuf[index++] = 0x82;
+        keyBuf[index++] = (uint8_t) (intModLEn >> 8);
+        keyBuf[index++] = (uint8_t) intModLEn & 0xFF;
+    }
+
+    //add null byte and modulus
+    ENSURE_OR_RETURN_ON_ERROR(index + 1 + modlen <= *keyLen, 0);
+    keyBuf[index++] = 0x00;  // Null byte
+    memcpy(keyBuf + index, modulus, modlen);
+    index += modlen;
+
+    /*Copy the public Exponent*/
+    ENSURE_OR_RETURN_ON_ERROR(index + 1 + 1 + pubExplen <= *keyLen, 0);
+    keyBuf[index++] = 0x02;                     // tag
+    keyBuf[index++] = (uint8_t) pubExplen;      // length
+    memcpy(keyBuf + index, exponent, pubExplen);  // value
+    index += pubExplen;
+    *keyLen = index;
+
+    return 1;
+}
+
+int SE05XClass::generatePrivateRSAKey(
+    int keyID, byte modulus[], size_t* modLen, byte exponent[], size_t* expLen, uint16_t keyBitLength)
+{
+    smStatus_t     status;
+    SE05x_Result_t result;
+
+    ENSURE_OR_RETURN_ON_ERROR(((keyBitLength / 8)) <= *modLen, 0);
+    ENSURE_OR_RETURN_ON_ERROR((SE05X_RSA_PUBLIC_EXPONENT_SIZE) <= *modLen, 0);
+
+    status = Se05x_API_CheckObjectExists(&_se05x_session, keyID, &result);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_CheckObjectExists \n");
+        return 0;
+    }
+
+    if (result == kSE05x_Result_SUCCESS)
+    {
+        SMLOG_I("Object already exists \n");
+    }else{
+        keyBitLength = (status == 1) ? 0 : keyBitLength;
+
+        ENSURE_OR_RETURN_ON_ERROR(keyBitLength <= UINT16_MAX, 0);
+
+        SMLOG_I("Generate RSA key \n");
+        status = Se05x_API_WriteRSAKey(&_se05x_session, NULL, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                       SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                       SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, kSE05x_INS_NA,
+                                       kSE05x_KeyPart_Pair, kSE05x_RSAKeyFormat_RAW);
+        if (status != SM_OK)
+        {
+            SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+            return 0;
+        }
+    }
+
+    status = Se05x_API_ReadRSA(&_se05x_session, keyID, 0, 0, kSE05x_RSAPubKeyComp_MOD, modulus, modLen);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_ReadRSA kSE05x_RSAPubKeyComp_MOD \n");
+        return 0;
+    }
+
+    status = Se05x_API_ReadRSA(&_se05x_session, keyID, 0, 0, kSE05x_RSAPubKeyComp_PUB_EXP, exponent, expLen);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_ReadRSA kSE05x_RSAPubKeyComp_PUB_EXP \n");
+        return 0;
+    }
+    return 1;
+}
+
+int SE05XClass::writeRSAKey(int                  keyID,
+                            SE05x_RSABitLength_t keyBitLength,
+                            const uint8_t*       p,
+                            size_t               pLen,
+                            const uint8_t*       q,
+                            size_t               qLen,
+                            const uint8_t*       dp,
+                            size_t               dpLen,
+                            const uint8_t*       dq,
+                            size_t               dqLen,
+                            const uint8_t*       qInv,
+                            size_t               qInvLen,
+                            const uint8_t*       pubExp,
+                            size_t               pubExpLen,
+                            const uint8_t*       priv,
+                            size_t               privLen,
+                            const uint8_t*       pubMod,
+                            size_t               pubModLen,
+                            SE05x_RSAKeyFormat_t rsa_format,
+                            bool                 transient,
+                            SE05x_KeyPart_t      keyType,
+                            pSe05xPolicy_t       policy)
+{
+    smStatus_t     status;
+    SE05x_Result_t result;
+    SE05x_INS_t    transient_type = kSE05x_INS_NA;  // Se05x_API_WriteRSAKey always sets INS_WRITE, kSE05x_INS_TRANSIENT is a additional flag
+
+    ENSURE_OR_RETURN_ON_ERROR(
+        (keyType == kSE05x_KeyPart_Public || keyType == kSE05x_KeyPart_Private || keyType == kSE05x_KeyPart_Pair), 0);
+    ENSURE_OR_RETURN_ON_ERROR((keyBitLength == kSE05x_RSABitLength_512 || keyBitLength == kSE05x_RSABitLength_1024
+                               || keyBitLength == kSE05x_RSABitLength_1152 || keyBitLength == kSE05x_RSABitLength_2048
+                               || keyBitLength == kSE05x_RSABitLength_3072 || keyBitLength == kSE05x_RSABitLength_4096),
+                              0);
+
+
+    status = Se05x_API_CheckObjectExists(&_se05x_session, keyID, &result);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_CheckObjectExists \n");
+        return 0;
+    }
+
+    if (result == kSE05x_Result_SUCCESS)
+    {
+        SMLOG_I("Object already exists \n");
+        return 0;
+    }
+
+    if (transient)
+    {
+        transient_type = kSE05x_INS_TRANSIENT;
+    }
+    else
+    {
+        transient_type = kSE05x_INS_NA;
+    }
+
+    SMLOG_I("Generate RSA key \n");
+    // every key part must be written seperately
+    if (rsa_format == kSE05x_RSAKeyFormat_RAW)
+    {
+        // check if all reqired values exist
+        ENSURE_OR_RETURN_ON_ERROR(pubMod != NULL, 0);
+        ENSURE_OR_RETURN_ON_ERROR(pubModLen != 0, 0);
+
+        if (keyType == kSE05x_KeyPart_Public || keyType == kSE05x_KeyPart_Pair)
+        {
+            ENSURE_OR_RETURN_ON_ERROR(pubExp != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(pubExpLen != 0, 0);
+        }
+
+        if (keyType == kSE05x_KeyPart_Private || keyType == kSE05x_KeyPart_Pair)
+        {
+            ENSURE_OR_RETURN_ON_ERROR(priv != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(privLen != 0, 0);
+        }
+
+        // mod is used in private, public and keypair
+        status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                       SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                       SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, pubMod, pubModLen, transient_type,
+                                       keyType, rsa_format);
+        if (status != SM_OK)
+        {
+            SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+            return 0;
+        }
+
+        // write public exponent
+        if (keyType == kSE05x_KeyPart_Public || keyType == kSE05x_KeyPart_Pair)
+        {
+            // public exponent
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) 0, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv, pubExp,
+                                           pubExpLen, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+        }
+
+        if (keyType == kSE05x_KeyPart_Private || keyType == kSE05x_KeyPart_Pair)
+        {
+            // private exponent
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) 0, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, priv, privLen, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+        }
+    }
+    else if (rsa_format == kSE05x_RSAKeyFormat_CRT)
+    {
+        if (keyType == kSE05x_KeyPart_Public)
+        {
+            // mod is used in public and keypair
+            ENSURE_OR_RETURN_ON_ERROR(pubMod != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(pubModLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(pubExp != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(pubExpLen != 0, 0);
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, pubMod, pubModLen, transient_type,
+                                           keyType, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            // public exponent
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv, pubExp,
+                                           pubExpLen, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+        }
+        else if (keyType == kSE05x_KeyPart_Private)
+        {
+            ENSURE_OR_RETURN_ON_ERROR(p != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(pLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(q != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(qLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(dp != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(dpLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(dq != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(dqLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(qInv != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(qInvLen != 0, 0);
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, p, pLen,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           keyType, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p, q,
+                                           qLen, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, dp, dpLen, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, dq, dqLen, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, qInv, qInvLen,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+        }
+        else if (keyType == kSE05x_KeyPart_Pair)
+        {
+            ENSURE_OR_RETURN_ON_ERROR(p != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(pLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(q != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(qLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(dp != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(dpLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(dq != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(dqLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(qInv != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(qInvLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(pubMod != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(pubModLen != 0, 0);
+
+            ENSURE_OR_RETURN_ON_ERROR(pubExp != NULL, 0);
+            ENSURE_OR_RETURN_ON_ERROR(pubExpLen != 0, 0);
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, p, pLen,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           keyType, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p, q,
+                                           qLen, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, dp, dpLen, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, dq, dqLen, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, qInv, qInvLen,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            // mod is used in public and keypair
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv,
+                                           SE05X_RSA_NO_pubExp, SE05X_RSA_NO_priv, pubMod, pubModLen, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+
+            status = Se05x_API_WriteRSAKey(&_se05x_session, policy, keyID, (uint16_t) keyBitLength, SE05X_RSA_NO_p,
+                                           SE05X_RSA_NO_q, SE05X_RSA_NO_dp, SE05X_RSA_NO_dq, SE05X_RSA_NO_qInv, pubExp,
+                                           pubExpLen, SE05X_RSA_NO_priv, SE05X_RSA_NO_pubMod, transient_type,
+                                           kSE05x_KeyPart_NA, rsa_format);
+            if (status != SM_OK)
+            {
+                SMLOG_E("Error in Se05x_API_WriteRSAKey \n");
+                return 0;
+            }
+        }
+    }
+
+    uint8_t modulus[520] = {0};
+    uint8_t exponent[4]  = {0};
+    size_t  modlen       = sizeof(modulus);
+    size_t  pubExplen    = sizeof(exponent);
+    status = Se05x_API_ReadRSA(&_se05x_session, keyID, 0, 0, kSE05x_RSAPubKeyComp_MOD, modulus, &modlen);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_ReadRSA kSE05x_RSAPubKeyComp_MOD \n");
+        return 0;
+    }
+
+    status = Se05x_API_ReadRSA(&_se05x_session, keyID, 0, 0, kSE05x_RSAPubKeyComp_PUB_EXP, exponent, &pubExplen);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_ReadRSA kSE05x_RSAPubKeyComp_PUB_EXP \n");
+        return 0;
+    }
+    if (memcmp(modulus, pubMod, pubModLen) != 0 && memcmp(exponent, pubExp, pubExplen) != 0)
+        return 0;
+        
     return 1;
 }
 

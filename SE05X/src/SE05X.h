@@ -69,6 +69,23 @@ public:
      * @return 0 on Failure 1 on Success
      */
     int generatePrivateKey(int keyID, byte keyBuf[], size_t keyBufMaxLen, size_t* keyLen);
+    
+    /** generatePrivateRSAKey
+     *
+     * Create a new RSA keypair. Only public key will be available
+     * inside KeyBuf with DER format.
+     *
+     * |Header (23-29 bytes)| lenght of mod, up to 3 bytes | 0x00 (1 byte) | Public key mod value (up to 512 bytes) |
+     * length public exp 2 bytes | 0x00 (1 byte) | public exp 3-4 bytes |
+     *
+     * @param[in] KeyID Se050 objectID where to store the private key
+     * @param[out] keyBuf Buffer containing the public key in DER format
+     * @param[in] keyBufMaxLen Buffer size in bytes
+     * @param[in,out] keyLen Public key size in bytes
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int generatePrivateRSAKey(int keyID, byte keyBuf[], size_t keyBufMaxLen, size_t* keyLen, uint16_t keyBitLength);
 
     /** generatePublicKey
      *
@@ -85,6 +102,61 @@ public:
      * @return 0 on Failure 1 on Success
      */
     int generatePublicKey(int keyID, byte keyBuf[], size_t keyBufMaxLen, size_t* keyLen);
+
+        /** writeRSAKey
+     *
+     * writeRSAKey can be public, private and keypair, depending on keyType
+     * CRT and RAW rsa_format are supported (if a value is missing the method retruns with 0)
+     * When policy is set to NULL, default policy is used
+     *
+     * @param[in]  size            The size
+     * @param[in]  p               The part p
+     * @param[in]  pLen            The p length
+     * @param[in]  q               The quarter
+     * @param[in]  qLen            The quarter length
+     * @param[in]  dp              The part dp
+     * @param[in]  dpLen           The dp length
+     * @param[in]  dq              The part dq
+     * @param[in]  dqLen           The dq length
+     * @param[in]  qInv            The quarter inv
+     * @param[in]  qInvLen         The quarter inv length
+     * @param[in]  pubExp          The pub exponent
+     * @param[in]  pubExpLen       The pub exponent length
+     * @param[in]  priv            The priv
+     * @param[in]  privLen         The priv length
+     * @param[in]  pubMod          The pub modifier
+     * @param[in]  pubModLen       The pub modifier length
+     * @param[in]  transient
+     * @param[in]  key_part        The key part   (public/private/keypair)
+     * @param[in]  rsa_format      The rsa format (raw/crt)
+     * @param[in] KeyID Se050 objectID where is stored the public key or keypair
+     * @param[in] keyBitLength Public key size in nit
+     * @param[in] pSe05xPolicy_t       policy
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int writeRSAKey(int                  keyID,
+                    SE05x_RSABitLength_t keyBitLength,
+                    const uint8_t*       p,
+                    size_t               pLen,
+                    const uint8_t*       q,
+                    size_t               qLen,
+                    const uint8_t*       dp,
+                    size_t               dpLen,
+                    const uint8_t*       dq,
+                    size_t               dqLen,
+                    const uint8_t*       qInv,
+                    size_t               qInvLen,
+                    const uint8_t*       pubExp,
+                    size_t               pubExpLen,
+                    const uint8_t*       priv,
+                    size_t               privLen,
+                    const uint8_t*       pubMod,
+                    size_t               pubModLen,
+                    SE05x_RSAKeyFormat_t rsa_format,
+                    bool                 transient,
+                    SE05x_KeyPart_t      keyType,
+                    pSe05xPolicy_t       policy);
 
     /** importPublicKey
      *
@@ -323,6 +395,19 @@ public:
      * @return 0 on Failure 1 on Success
      */
     int generatePrivateKey(int slot, byte publicKey[]);
+    
+    /** generatePrivateRSAKey
+     *
+     * Create a new RSA keypair. Only public exponent and modulus values will be available
+     * inside the provided buffers.
+     *
+     * @param[in] slot Se050 objectID where to store the private key
+     * @param[out] exponent Buffer containing the public exponent
+     * @param[out] modulus Buffer containing the modulus
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int generatePrivateRSAKey(int keyID, byte modulus[], size_t* modLen, byte exponent[], size_t* expLen, uint16_t keyBitLength);
 
     /** generatePublicKey
      *
