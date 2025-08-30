@@ -59,7 +59,7 @@ smStatus_t Se05x_API_SessionOpen(pSe05xSession_t session_ctx)
 
     ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
 
-    buff_len = sizeof(session_ctx->apdu_buffer);
+    buff_len = sizeof(session_ctx->apdu_buffer)/2;
 
     ret = smComT1oI2C_Init(&session_ctx->conn_context, NULL);
     ENSURE_OR_GO_CLEANUP(SM_OK == ret);
@@ -99,7 +99,7 @@ smStatus_t Se05x_API_SessionOpen(pSe05xSession_t session_ctx)
         memcpy(&session_ctx->apdu_buffer[5], appSsdName, appSsdNameLen);
         session_ctx->apdu_buffer[tx_len - 1] = 0; /* Le */
 
-        buff_len = sizeof(session_ctx->apdu_buffer);
+        buff_len = sizeof(session_ctx->apdu_buffer)/2;
         ret      = smComT1oI2C_TransceiveRaw(
             session_ctx->conn_context, session_ctx->apdu_buffer, tx_len, session_ctx->apdu_buffer, &buff_len);
         if (ret != SM_OK) {
@@ -208,8 +208,8 @@ smStatus_t Se05x_API_ReadObject(
     ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
 
     pCmdbuf   = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     SMLOG_D("APDU - ReadObject [] \n");
 
@@ -256,8 +256,8 @@ smStatus_t Se05x_API_GetVersion(pSe05xSession_t session_ctx, uint8_t *pappletVer
 
     ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
 
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     SMLOG_D("APDU - GetVersion [] \n");
 
@@ -297,8 +297,8 @@ smStatus_t Se05x_API_ECDSASign(pSe05xSession_t session_ctx,
     ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
 
     pCmdbuf   = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     SMLOG_D("APDU - ECDSASign [] \n");
 
@@ -351,8 +351,8 @@ smStatus_t Se05x_API_ECDSAVerify(pSe05xSession_t session_ctx,
     ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
 
     pCmdbuf   = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     SMLOG_D("APDU - ECDSAVerify [] \n");
 
@@ -402,8 +402,8 @@ smStatus_t Se05x_API_CheckObjectExists(pSe05xSession_t session_ctx, uint32_t obj
     ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
 
     pCmdbuf   = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     SMLOG_D("APDU - CheckObjectExists [] \n");
 
@@ -496,8 +496,8 @@ smStatus_t Se05x_API_ECDHGenerateSharedSecret(pSe05xSession_t session_ctx,
     ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
 
     pCmdbuf   = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     SMLOG_D("APDU -ECDHGenerateSharedSecret [] \n");
 
@@ -548,8 +548,8 @@ smStatus_t Se05x_API_CipherOneShot(pSe05xSession_t session_ctx,
     ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
 
     pCmdbuf   = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     SMLOG_D("APDU - CipherOneShot [] \n");
 
@@ -680,8 +680,8 @@ smStatus_t Se05x_API_GetRandom(pSe05xSession_t session_ctx, uint16_t size, uint8
     SMLOG_D("APDU - Se05x_API_GetRandom [] \n");
 
     pCmdbuf = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
     
     tlvRet = TLVSET_U16("size", &pCmdbuf, &cmdbufLen, kSE05x_TAG_1, size);
     if (0 != tlvRet) {
@@ -778,8 +778,8 @@ smStatus_t Se05x_API_DigestFinal(pSe05xSession_t session_ctx,
     SMLOG_D("APDU - Se05x_API_DigestFinal [] \n");
 
     pCmdbuf = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     tlvRet = TLVSET_U16("cryptoObjectID", &pCmdbuf, &cmdbufLen, kSE05x_TAG_2, cryptoObjectID);
     if (0 != tlvRet) {
@@ -826,8 +826,8 @@ smStatus_t Se05x_API_DigestOneShot(pSe05xSession_t session_ctx,
     SMLOG_D("APDU - Se05x_API_DigestOneShot [] \n");
 
     pCmdbuf = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     tlvRet = TLVSET_U8("digestMode", &pCmdbuf, &cmdbufLen, kSE05x_TAG_1, digestMode);
     if (0 != tlvRet) {
@@ -876,8 +876,8 @@ smStatus_t Se05x_API_MACOneShot_G(pSe05xSession_t session_ctx,
     SMLOG_D("APDU - Se05x_API_MACOneShot_G [] \n");
 
     pCmdbuf = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     tlvRet = TLVSET_U32("objectID", &pCmdbuf, &cmdbufLen, kSE05x_TAG_1, objectID);
     if (0 != tlvRet) {
@@ -994,8 +994,8 @@ smStatus_t Se05x_API_ReadIDList(pSe05xSession_t session_ctx,
     SMLOG_D("APDU - Se05x_API_DigestOneShot [] \n");
 
     pCmdbuf = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     tlvRet = TLVSET_U16("output offset", &pCmdbuf, &cmdbufLen, kSE05x_TAG_1, outputOffset);
     if (0 != tlvRet) {
@@ -1104,8 +1104,8 @@ smStatus_t Se05x_API_ReadSize(pSe05xSession_t session_ctx, uint32_t objectID, ui
     SMLOG_D("APDU - Se05x_API_DeleteCryptoObject [] \n");
 
     pCmdbuf = &session_ctx->apdu_buffer[0];
-    pRspbuf   = &session_ctx->apdu_buffer[0];
-    rspbufLen = sizeof(session_ctx->apdu_buffer);
+    pRspbuf   = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
 
     tlvRet = TLVSET_U32("object id", &pCmdbuf, &cmdbufLen, kSE05x_TAG_1, objectID);
     if (0 != tlvRet) {
@@ -1116,6 +1116,263 @@ smStatus_t Se05x_API_ReadSize(pSe05xSession_t session_ctx, uint32_t objectID, ui
         retStatus       = SM_NOT_OK;
         size_t rspIndex = 0;
         tlvRet          = tlvGet_U16(pRspbuf, &rspIndex, rspbufLen, kSE05x_TAG_1, psize); /* - */
+        if (0 != tlvRet) {
+            goto cleanup;
+        }
+        if ((rspIndex + 2) == rspbufLen) {
+            retStatus = (smStatus_t)((pRspbuf[rspIndex] << 8) | (pRspbuf[rspIndex + 1]));
+        }
+    }
+
+cleanup:
+    return retStatus;
+}
+
+
+
+smStatus_t Se05x_API_RSAEncrypt(pSe05xSession_t session_ctx,
+    uint32_t objectID,
+    SE05x_RSAEncryptionAlgo_t rsaEncryptionAlgo,
+    const uint8_t* inputData,
+    size_t inputDataLen,
+    uint8_t* encryptedData,
+    size_t* pencryptedDataLen)
+{
+    smStatus_t retStatus = SM_NOT_OK;
+    tlvHeader_t hdr = { { kSE05x_CLA, kSE05x_INS_CRYPTO, kSE05x_P1_RSA, kSE05x_P2_ENCRYPT_ONESHOT } };
+    size_t cmdbufLen = 0;
+    uint8_t* pCmdbuf = NULL;
+    int tlvRet = 0;
+    uint8_t* pRspbuf = NULL;
+    size_t rspbufLen = 0;
+
+    ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
+
+    pCmdbuf = &session_ctx->apdu_buffer[0];
+    pRspbuf = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
+
+    SMLOG_D("APDU - RSAEncrypt [] \n");
+
+    tlvRet = TLVSET_U32("objectID", &pCmdbuf, &cmdbufLen, kSE05x_TAG_1, objectID);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_RSAEncryptionAlgo("rsaEncryptionAlgo", &pCmdbuf, &cmdbufLen, kSE05x_TAG_2, rsaEncryptionAlgo);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional("inputData", &pCmdbuf, &cmdbufLen, kSE05x_TAG_3, inputData, inputDataLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    retStatus = DoAPDUTxRx(session_ctx, &hdr, session_ctx->apdu_buffer, cmdbufLen, pRspbuf, &rspbufLen, 1);
+    if (retStatus == SM_OK) {
+        retStatus = SM_NOT_OK;
+        size_t rspIndex = 0;
+        tlvRet = tlvGet_u8buf(pRspbuf, &rspIndex, rspbufLen, kSE05x_TAG_1, encryptedData, pencryptedDataLen); /*  */
+        if (0 != tlvRet) {
+            goto cleanup;
+        }
+        if ((rspIndex + 2) == rspbufLen) {
+            retStatus = (smStatus_t)((pRspbuf[rspIndex] << 8) | (pRspbuf[rspIndex + 1]));
+        }
+    }
+
+cleanup:
+    return retStatus;
+}
+
+smStatus_t Se05x_API_RSADecrypt(pSe05xSession_t session_ctx,
+    uint32_t objectID,
+    SE05x_RSAEncryptionAlgo_t rsaEncryptionAlgo,
+    const uint8_t* inputData,
+    size_t inputDataLen,
+    uint8_t* decryptedData,
+    size_t* pdecryptedDataLen)
+{
+    smStatus_t retStatus = SM_NOT_OK;
+    tlvHeader_t hdr = { { kSE05x_CLA, kSE05x_INS_CRYPTO, kSE05x_P1_RSA, kSE05x_P2_DECRYPT_ONESHOT } };
+    size_t cmdbufLen = 0;
+    uint8_t* pCmdbuf = NULL;
+    int tlvRet = 0;
+    uint8_t* pRspbuf = NULL;
+    size_t rspbufLen = 0;
+
+    ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
+
+    pCmdbuf = &session_ctx->apdu_buffer[0];
+    pRspbuf = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
+
+    SMLOG_D("APDU - RSADecrypt [] \n");
+
+    tlvRet = TLVSET_U32("objectID", &pCmdbuf, &cmdbufLen, kSE05x_TAG_1, objectID);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_RSAEncryptionAlgo("rsaEncryptionAlgo", &pCmdbuf, &cmdbufLen, kSE05x_TAG_2, rsaEncryptionAlgo);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional("inputData", &pCmdbuf, &cmdbufLen, kSE05x_TAG_3, inputData, inputDataLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    retStatus = DoAPDUTxRx(session_ctx, &hdr, session_ctx->apdu_buffer, cmdbufLen, pRspbuf, &rspbufLen, 1);
+    if (retStatus == SM_OK) {
+        retStatus = SM_NOT_OK;
+        size_t rspIndex = 0;
+        tlvRet = tlvGet_u8buf(pRspbuf, &rspIndex, rspbufLen, kSE05x_TAG_1, decryptedData, pdecryptedDataLen); /*  */
+        if (0 != tlvRet) {
+            goto cleanup;
+        }
+        if ((rspIndex + 2) == rspbufLen) {
+            retStatus = (smStatus_t)((pRspbuf[rspIndex] << 8) | (pRspbuf[rspIndex + 1]));
+        }
+    }
+
+cleanup:
+    return retStatus;
+}
+
+smStatus_t Se05x_API_WriteRSAKey(pSe05xSession_t session_ctx,
+    pSe05xPolicy_t policy,
+    uint32_t objectID,
+    uint16_t size,
+    const uint8_t* p,
+    size_t pLen,
+    const uint8_t* q,
+    size_t qLen,
+    const uint8_t* dp,
+    size_t dpLen,
+    const uint8_t* dq,
+    size_t dqLen,
+    const uint8_t* qInv,
+    size_t qInvLen,
+    const uint8_t* pubExp,
+    size_t pubExpLen,
+    const uint8_t* priv,
+    size_t privLen,
+    const uint8_t* pubMod,
+    size_t pubModLen,
+    const SE05x_INS_t ins_type,
+    const SE05x_KeyPart_t key_part,
+    const SE05x_RSAKeyFormat_t rsa_format)
+{
+    smStatus_t retStatus = SM_NOT_OK;
+    tlvHeader_t hdr = { { kSE05x_CLA, kSE05x_INS_WRITE | ins_type, (uint8_t)kSE05x_P1_RSA | key_part, rsa_format } };
+    size_t cmdbufLen = 0;
+    uint8_t* pCmdbuf = NULL;
+    int tlvRet = 0;
+
+    SMLOG_D("APDU - WriteRSAKey [] causes NVM Writes \n");
+
+    if ((p == NULL) && (q == NULL) && (dp == NULL) && (dq == NULL) && (qInv == NULL) && (pubExp == NULL) && (priv == NULL) && (pubMod == NULL)) {
+        if (key_part == kSE05x_KeyPart_Private) {
+            SMLOG_E("Only Private Key cannot be generated. Use Key Pair option instead");
+            goto cleanup;
+        }
+    }
+
+    pCmdbuf = &session_ctx->apdu_buffer[0];
+
+    tlvRet = TLVSET_Se05xPolicy("To be Checked(last 3 not pdf)", &pCmdbuf, &cmdbufLen, kSE05x_TAG_POLICY, policy);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_U32("object id", &pCmdbuf, &cmdbufLen, kSE05x_TAG_1, objectID);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_U16Optional("size in bits", &pCmdbuf, &cmdbufLen, kSE05x_TAG_2, size);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional_ByteShift("p", &pCmdbuf, &cmdbufLen, kSE05x_TAG_3, p, pLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional_ByteShift("q", &pCmdbuf, &cmdbufLen, kSE05x_TAG_4, q, qLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional_ByteShift("dp", &pCmdbuf, &cmdbufLen, kSE05x_TAG_5, dp, dpLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional_ByteShift("dq", &pCmdbuf, &cmdbufLen, kSE05x_TAG_6, dq, dqLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional_ByteShift("qnv", &pCmdbuf, &cmdbufLen, kSE05x_TAG_7, qInv, qInvLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional("public exp", &pCmdbuf, &cmdbufLen, kSE05x_TAG_8, pubExp, pubExpLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional_ByteShift("priv", &pCmdbuf, &cmdbufLen, kSE05x_TAG_9, priv, privLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_u8bufOptional_ByteShift("public mod", &pCmdbuf, &cmdbufLen, kSE05x_TAG_10, pubMod, pubModLen);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    // Case 3 command, no reply expected
+    retStatus = DoAPDUTx(session_ctx, &hdr, session_ctx->apdu_buffer, cmdbufLen, 1);
+
+cleanup:
+    return retStatus;
+}
+
+smStatus_t Se05x_API_ReadRSA(pSe05xSession_t session_ctx,
+    uint32_t objectID,
+    uint16_t offset,
+    uint16_t length,
+    SE05x_RSAPubKeyComp_t rsa_key_comp,
+    uint8_t* data,
+    size_t* pdataLen)
+{
+    smStatus_t retStatus = SM_NOT_OK;
+    tlvHeader_t hdr = { { kSE05x_CLA, kSE05x_INS_READ, kSE05x_P1_DEFAULT, kSE05x_P2_DEFAULT } };
+    size_t cmdbufLen = 0;
+    uint8_t* pCmdbuf = NULL;
+    int tlvRet = 0;
+    uint8_t* pRspbuf = NULL;
+    size_t rspbufLen = 0;
+
+    ENSURE_OR_GO_CLEANUP(session_ctx != NULL);
+
+    pCmdbuf = &session_ctx->apdu_buffer[0];
+    pRspbuf = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
+    rspbufLen = sizeof(session_ctx->apdu_buffer)/2;
+
+    SMLOG_D("APDU - ReadRSA [] \n");
+
+    tlvRet = TLVSET_U32("object id", &pCmdbuf, &cmdbufLen, kSE05x_TAG_1, objectID);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_U16Optional("offset", &pCmdbuf, &cmdbufLen, kSE05x_TAG_2, offset);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_U16Optional("length", &pCmdbuf, &cmdbufLen, kSE05x_TAG_3, length);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    tlvRet = TLVSET_RSAPubKeyComp("rsa_key_comp", &pCmdbuf, &cmdbufLen, kSE05x_TAG_4, rsa_key_comp);
+    if (0 != tlvRet) {
+        goto cleanup;
+    }
+    retStatus = DoAPDUTxRx(session_ctx, &hdr, session_ctx->apdu_buffer, cmdbufLen, pRspbuf, &rspbufLen, 1);
+    if (retStatus == SM_OK) {
+        retStatus = SM_NOT_OK;
+        size_t rspIndex = 0;
+        tlvRet = tlvGet_u8buf(pRspbuf, &rspIndex, rspbufLen, kSE05x_TAG_1, data, pdataLen); /*  */
         if (0 != tlvRet) {
             goto cleanup;
         }

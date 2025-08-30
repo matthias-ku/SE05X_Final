@@ -113,6 +113,189 @@ smStatus_t Se05x_API_WriteECKey(pSe05xSession_t session_ctx,
     const SE05x_INS_t ins_type,
     const SE05x_KeyPart_t key_part);
 
+    /** Se05x_API_WriteRSAKey
+ *
+ * Creates or writes an RSA key or a key component.
+ *
+ * Supported key sizes are listed in RSABitLength. Other values are not
+ * supported.
+ *
+ * An RSA key creation requires multiple ADPUs to be sent:
+ *
+ *   * The first APDU must contain:
+ *
+ *     * Policy (optional, so only if non-default applies)
+ *
+ *     * Object identifier
+ *
+ *     * Key size
+ *
+ *     * 1 of the key components.
+ *
+ *   * Each next APDU must contain 1 of the key components.
+ *
+ * The policy applies only once all key components are set.
+ *
+ * Once an RSAKey object has been created, its format remains fixed and cannot
+ * be updated (so CRT or raw mode, no switch possible).
+ *
+ * If the object already exists, P1KeyType is ignored.
+ *
+ * For key pairs, if no component is present (TAG_3 until TAG_9), the key pair
+ * will be generated on chip; otherwise the key pair will be constructed
+ * starting with the given component.
+ *
+ * For private keys or public keys, there should always be exactly one of the
+ * tags TAG_3 until TAG_10.
+ *
+ *   * TLV[TAG_8] and TLV[TAG_10] must only contain a value if the key pair is
+ *     to be set to a known value and P1KeyType is either P1_KEY_PAIR or
+ *     P1_PUBLIC; otherwise the value must be absent and the length must be
+ *     equal to 0.
+ *
+ *   * TLV[TAG_9] must only contain a value it the key is to be set in raw mode
+ *     to a known value and P1KeyType is either P1_KEY_PAIR or P1_PRIVATE;
+ *     otherwise the value must be absent and the length must be equal to 0.
+ *
+ *   * If TLV[TAG_3] up to TLV[TAG_10] are absent (except TLV[TAG_8]), the RSA
+ *     key will be generated on chip in case the object does not yet exist;
+ *     otherwise it will be regenerated. This only applies to RSA key pairs.
+ *
+ *   * Keys can be set by setting the different components of a key; only 1
+ *     component can be set at a time in this case.
+ *
+ *
+ * @rst
+ * +---------+-------------------------------+------------------------------------------------+
+ * | Field   | Value                         | Description                                    |
+ * +=========+===============================+================================================+
+ * | P1      | :cpp:type:`SE05x_KeyPart_t` | | See :cpp:type:`SE05x_P1_t`                     |
+ * |         | P1_RSA                        |                                                |
+ * +---------+-------------------------------+------------------------------------------------+
+ * | P2      | P2_DEFAULT or P2_RAW          | See :cpp:type:`SE05x_P2_t`; P2_RAW only in     |
+ * |         |                               | case P1KeyPart = P1_KEY_PAIR and  TLV[TAG_3]   |
+ * |         |                               | until TLV[TAG_10] is empty and the  must       |
+ * |         |                               | generate a raw RSA key pair; all other  cases: |
+ * |         |                               | P2_DEFAULT.                                    |
+ * +---------+-------------------------------+------------------------------------------------+
+ * | Payload | TLV[TAG_POLICY]               | Byte array containing the object policy.       |
+ * |         |                               | [Optional: default policy applies]             |
+ * |         |                               | [Conditional: only when the object identifier  |
+ * |         |                               | is not in use yet]                             |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_1]                    | 4-byte object identifier                       |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_2]                    | 2-byte key size in bits                        |
+ * |         |                               | (:cpp:type:`SE05x_RSABitLength_t`)             |
+ * |         |                               | [Conditional: only when the object identifier  |
+ * |         |                               | is not in use yet]                             |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_3]                    | P component   [Conditional: only when the      |
+ * |         |                               | object identifier is in CRT mode and the key   |
+ * |         |                               | is generated externally and P1KeyPart is       |
+ * |         |                               | either P1_KEY_PAIR or P1_PRIVATE]              |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_4]                    | Q component   [Conditional: only when the      |
+ * |         |                               | object identifier is in CRT mode and the key   |
+ * |         |                               | is generated externally and P1KeyPart is       |
+ * |         |                               | either P1_KEY_PAIR or P1_PRIVATE]              |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_5]                    | DP component   [Conditional: only when the     |
+ * |         |                               | object identifier is in CRT mode and the key   |
+ * |         |                               | is generated externally and P1KeyPart is       |
+ * |         |                               | either P1_KEY_PAIR or P1_PRIVATE]              |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_6]                    | DQ component   [Conditional: only when the     |
+ * |         |                               | object identifier is in CRT mode and the key   |
+ * |         |                               | is generated externally and P1KeyPart is       |
+ * |         |                               | either P1_KEY_PAIR or P1_PRIVATE]              |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_7]                    | INV_Q component   [Conditional: only when the  |
+ * |         |                               | object identifier is in CRT mode and the key   |
+ * |         |                               | is generated externally and P1KeyPart is       |
+ * |         |                               | either P1_KEY_PAIR or P1_PRIVATE]              |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_8]                    | Public exponent                                |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_9]                    | Private Key (non-CRT mode only)                |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_10]                   | Public Key (Modulus)                           |
+ * +---------+-------------------------------+------------------------------------------------+
+ * |         | TLV[TAG_11]                   | 4-byte version    [Optional]                   |
+ * +---------+-------------------------------+------------------------------------------------+
+ * @endrst
+ *
+ * @param[in]  session_ctx     The session context
+ * @param[in]  policy          The policy
+ * @param[in]  objectID        The object id
+ * @param[in]  size            The size
+ * @param[in]  p               The part p
+ * @param[in]  pLen            The p length
+ * @param[in]  q               The quarter
+ * @param[in]  qLen            The quarter length
+ * @param[in]  dp              The part dp
+ * @param[in]  dpLen           The dp length
+ * @param[in]  dq              The part dq
+ * @param[in]  dqLen           The dq length
+ * @param[in]  qInv            The quarter inv
+ * @param[in]  qInvLen         The quarter inv length
+ * @param[in]  pubExp          The pub exponent
+ * @param[in]  pubExpLen       The pub exponent length
+ * @param[in]  priv            The priv
+ * @param[in]  privLen         The priv length
+ * @param[in]  pubMod          The pub modifier
+ * @param[in]  pubModLen       The pub modifier length
+ * @param[in]  transient_type  The transient type
+ * @param[in]  key_part        The key part
+ * @param[in]  rsa_format      The rsa format
+ *
+ * @return     The sm status.
+ */
+
+smStatus_t Se05x_API_WriteRSAKey(pSe05xSession_t            session_ctx,
+    pSe05xPolicy_t             policy,
+    uint32_t                   objectID,
+    uint16_t                   size,
+    const uint8_t*             p,
+    size_t                     pLen,
+    const uint8_t*             q,
+    size_t                     qLen,
+    const uint8_t*             dp,
+    size_t                     dpLen,
+    const uint8_t*             dq,
+    size_t                     dqLen,
+    const uint8_t*             qInv,
+    size_t                     qInvLen,
+    const uint8_t*             pubExp,
+    size_t                     pubExpLen,
+    const uint8_t*             priv,
+    size_t                     privLen,
+    const uint8_t*             pubMod,
+    size_t                     pubModLen,
+    const SE05x_INS_t          transient_type,
+    const SE05x_KeyPart_t      key_part,
+    const SE05x_RSAKeyFormat_t rsa_format);
+
+/** Se05x_API_ReadRSA
+*
+* See @ref Se05x_API_ReadObject
+*
+* @param[in] session_ctx Session Context [0:kSE05x_pSession]
+* @param[in] objectID object id [1:kSE05x_TAG_1]
+* @param[in] offset offset [2:kSE05x_TAG_2]
+* @param[in] length length [3:kSE05x_TAG_3]
+* @param[in] rsa_key_comp rsa_key_comp [4:kSE05x_TAG_4]
+* @param[out] data  [0:kSE05x_TAG_1]
+* @param[in,out] pdataLen Length for data
+*/
+smStatus_t Se05x_API_ReadRSA(pSe05xSession_t       session_ctx,
+    uint32_t              objectID,
+    uint16_t              offset,
+    uint16_t              length,
+    SE05x_RSAPubKeyComp_t rsa_key_comp,
+    uint8_t*              data,
+    size_t*               pdataLen);
+
 /** Se05x_API_ReadObject
  *
  * Reads the content of a Secure Object.
@@ -613,6 +796,144 @@ smStatus_t Se05x_API_ECDHGenerateSharedSecret(pSe05xSession_t session_ctx,
     size_t pubKeyLen,
     uint8_t *sharedSecret,
     size_t *psharedSecretLen);
+
+/** Se05x_API_RSAEncrypt
+ *
+ * The RSAEncrypt command encrypts data.
+ *
+ * # Command to Applet
+ *
+ * @rst
+ * +---------+--------------------+----------------------------------------------+
+ * | Field   | Value              | Description                                  |
+ * +=========+====================+==============================================+
+ * | CLA     | 0x80               |                                              |
+ * +---------+--------------------+----------------------------------------------+
+ * | INS     | INS_CRYPTO         | :cpp:type:`SE05x_INS_t`                      |
+ * +---------+--------------------+----------------------------------------------+
+ * | P1      | P1_RSA             | See :cpp:type:`SE05x_P1_t`                   |
+ * +---------+--------------------+----------------------------------------------+
+ * | P2      | P2_ENCRYPT_ONESHOT | See :cpp:type:`SE05x_P2_t`                   |
+ * +---------+--------------------+----------------------------------------------+
+ * | Lc      | #(Payload)         |                                              |
+ * +---------+--------------------+----------------------------------------------+
+ * | Payload | TLV[TAG_1]         | 4-byte identifier of the key pair or public  |
+ * |         |                    | key.                                         |
+ * +---------+--------------------+----------------------------------------------+
+ * |         | TLV[TAG_2]         | 1-byte :cpp:type:`SE05x_RSAEncryptionAlgo_t` |
+ * +---------+--------------------+----------------------------------------------+
+ * |         | TLV[TAG_3]         | Byte array containing data to be encrypted.  |
+ * +---------+--------------------+----------------------------------------------+
+ * | Le      | 0x00               | Expected TLV with encrypted data.            |
+ * +---------+--------------------+----------------------------------------------+
+ * @endrst
+ *
+ * # R-APDU Body
+ *
+ * @rst
+ * +------------+----------------+
+ * | Value      | Description    |
+ * +============+================+
+ * | TLV[TAG_1] | Encrypted data |
+ * +------------+----------------+
+ * @endrst
+ *
+ * # R-APDU Trailer
+ *
+ * @rst
+ * +-------------+--------------------------------------+
+ * | SW          | Description                          |
+ * +=============+======================================+
+ * | SW_NO_ERROR | The command is handled successfully. |
+ * +-------------+--------------------------------------+
+ * @endrst
+ *
+ *
+ * @param[in] session_ctx Session Context [0:kSE05x_pSession]
+ * @param[in] objectID objectID [1:kSE05x_TAG_1]
+ * @param[in] rsaEncryptionAlgo rsaEncryptionAlgo [2:kSE05x_TAG_2]
+ * @param[in] inputData inputData [3:kSE05x_TAG_3]
+ * @param[in] inputDataLen Length of inputData
+ * @param[out] encryptedData  [0:kSE05x_TAG_1]
+ * @param[in,out] pencryptedDataLen Length for encryptedData
+ */
+smStatus_t Se05x_API_RSAEncrypt(pSe05xSession_t           session_ctx,
+    uint32_t                  objectID,
+    SE05x_RSAEncryptionAlgo_t rsaEncryptionAlgo,
+    const uint8_t*            inputData,
+    size_t                    inputDataLen,
+    uint8_t*                  encryptedData,
+    size_t*                   pencryptedDataLen);
+
+    /** Se05x_API_RSADecrypt
+ *
+ * The RSADecrypt command decrypts data.
+ *
+ *
+ * # Command to Applet
+ *
+ * @rst
+ * +---------+--------------------+----------------------------------------------+
+ * | Field   | Value              | Description                                  |
+ * +=========+====================+==============================================+
+ * | CLA     | 0x80               |                                              |
+ * +---------+--------------------+----------------------------------------------+
+ * | INS     | INS_CRYPTO         | :cpp:type:`SE05x_INS_t`                      |
+ * +---------+--------------------+----------------------------------------------+
+ * | P1      | P1_RSA             | See :cpp:type:`SE05x_P1_t`                   |
+ * +---------+--------------------+----------------------------------------------+
+ * | P2      | P2_DECRYPT_ONESHOT | See :cpp:type:`SE05x_P2_t`                   |
+ * +---------+--------------------+----------------------------------------------+
+ * | Lc      | #(Payload)         |                                              |
+ * +---------+--------------------+----------------------------------------------+
+ * | Payload | TLV[TAG_1]         | 4-byte identifier of the key pair or private |
+ * |         |                    | key.                                         |
+ * +---------+--------------------+----------------------------------------------+
+ * |         | TLV[TAG_2]         | 1-byte :cpp:type:`SE05x_RSAEncryptionAlgo_t` |
+ * +---------+--------------------+----------------------------------------------+
+ * |         | TLV[TAG_3]         | Byte array containing data to be decrypted.  |
+ * +---------+--------------------+----------------------------------------------+
+ * | Le      | 0x00               | Expected TLV with decrypted data.            |
+ * +---------+--------------------+----------------------------------------------+
+ * @endrst
+ *
+ * # R-APDU Body
+ *
+ * @rst
+ * +------------+----------------+
+ * | Value      | Description    |
+ * +============+================+
+ * | TLV[TAG_1] | Encrypted data |
+ * +------------+----------------+
+ * @endrst
+ *
+ * # R-APDU Trailer
+ *
+ * @rst
+ * +-------------+--------------------------------------+
+ * | SW          | Description                          |
+ * +=============+======================================+
+ * | SW_NO_ERROR | The command is handled successfully. |
+ * +-------------+--------------------------------------+
+ * @endrst
+ *
+ *
+ *
+ * @param[in] session_ctx Session Context [0:kSE05x_pSession]
+ * @param[in] objectID objectID [1:kSE05x_TAG_1]
+ * @param[in] rsaEncryptionAlgo rsaEncryptionAlgo [2:kSE05x_TAG_2]
+ * @param[in] inputData inputData [3:kSE05x_TAG_3]
+ * @param[in] inputDataLen Length of inputData
+ * @param[out] decryptedData  [0:kSE05x_TAG_1]
+ * @param[in,out] pdecryptedDataLen Length for decryptedData
+ */
+smStatus_t Se05x_API_RSADecrypt(pSe05xSession_t           session_ctx,
+    uint32_t                  objectID,
+    SE05x_RSAEncryptionAlgo_t rsaEncryptionAlgo,
+    const uint8_t*            inputData,
+    size_t                    inputDataLen,
+    uint8_t*                  decryptedData,
+    size_t*                   pdecryptedDataLen);
 
 /**
  * @brief      Se05x_API_CipherOneShot
