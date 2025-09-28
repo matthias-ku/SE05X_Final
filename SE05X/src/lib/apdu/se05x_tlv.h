@@ -27,6 +27,7 @@ int tlvSet_U16(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, uint16_t value);
 int tlvSet_U32(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, uint32_t value);
 int tlvSet_u8buf(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, const uint8_t *cmd, size_t cmdLen);
 int tlvSet_u8bufOptional(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, const uint8_t *cmd, size_t cmdLen);
+int tlvSet_u8bufOptional_ByteShift(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, const uint8_t *cmd, size_t cmdLen);
 int tlvSet_U16Optional(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, uint16_t value);
 int tlvSet_Se05xPolicy(const char *description, uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, Se05xPolicy_t *policy);
 int tlvSet_MaxAttemps(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, uint16_t maxAttemps);
@@ -77,6 +78,10 @@ smStatus_t DoAPDUTxRx(pSe05xSession_t session_ctx,
     tlvSet_u8bufOptional(PBUF, PBUFLEN, TAG, CMD, CMDLEN);                 \
     DO_LOG_A(TAG, DESCRIPTION, CMD, CMDLEN)
 
+    #define TLVSET_u8bufOptional_ByteShift(DESCRIPTION, PBUF, PBUFLEN, TAG, CMD, CMDLEN) \
+    tlvSet_u8bufOptional_ByteShift(PBUF, PBUFLEN, TAG, CMD, CMDLEN);                 \
+    DO_LOG_A(TAG, DESCRIPTION, CMD, CMDLEN)
+
 #define TLVSET_U16Optional(DESCRIPTION, PBUF, PBUFLEN, TAG, VALUE) \
     tlvSet_U16Optional(PBUF, PBUFLEN, TAG, VALUE);                 \
     DO_LOG_V(TAG, DESCRIPTION, VALUE)
@@ -99,6 +104,10 @@ smStatus_t DoAPDUTxRx(pSe05xSession_t session_ctx,
 #define TLVSET_Header(PBUF, PBUFLEN, HDR) tlvSet_header(PBUF, PBUFLEN, HDR);
 
 #define TLVSET_ECSignatureAlgo TLVSET_U8
+#define TLVSET_RSAEncryptionAlgo TLVSET_U8
+#define TLVSET_RSAKeyComponent TLVSET_U8
+#define TLVSET_RSASignatureAlgo TLVSET_U8
+#define TLVSET_RSAPubKeyComp TLVSET_U8
 #define TLVSET_CipherMode TLVSET_U8
 
 #define TLVSET_CryptoModeSubType(DESCRIPTION, PBUF, PBUFLEN, TAG, VALUE) \

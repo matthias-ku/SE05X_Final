@@ -166,6 +166,27 @@ int tlvSet_u8bufOptional(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, const u
     }
 }
 
+int tlvSet_u8bufOptional_ByteShift(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, const uint8_t *cmd, size_t cmdLen)
+{
+    int ret = 1;
+    if (cmdLen == 0) {
+        ret = 0;
+    } else if (0 == (cmdLen & 1)) {
+        /* LSB is 0 */
+        ret = tlvSet_u8buf(buf, bufLen, tag, cmd, cmdLen);
+    } else {
+        uint8_t localBuff[MAX_APDU_BUFFER];
+        ENSURE_OR_GO_CLEANUP((cmdLen + 1) < sizeof(localBuff));
+        ENSURE_OR_GO_CLEANUP(cmd != NULL);
+        localBuff[0] = '\0';
+        memcpy(localBuff + 1, cmd, cmdLen);
+        ret = tlvSet_u8buf(buf, bufLen, tag, localBuff, cmdLen + 1);
+    }
+
+cleanup:
+    return ret;
+}
+
 int tlvSet_U16Optional(uint8_t **buf, size_t *bufLen, SE05x_TAG_t tag, uint16_t value)
 {
     if (value == 0) {
@@ -364,8 +385,8 @@ smStatus_t DoAPDUTx(
     pSe05xSession_t session_ctx, const tlvHeader_t *hdr, uint8_t *cmdBuf, size_t cmdBufLen, uint8_t hasle)
 {
     smStatus_t apduStatus = SM_NOT_OK;
-    size_t rxBufLen       = MAX_APDU_BUFFER;
-    uint8_t *rspBuf       = &session_ctx->apdu_buffer[0];
+    size_t rxBufLen       = sizeof(session_ctx->apdu_buffer) / 2;
+    uint8_t *rspBuf       = &session_ctx->apdu_buffer[ADPU_BUFFER_RX_OFFSET];
 
     ENSURE_OR_GO_EXIT(hdr != NULL);
     if (cmdBufLen > 0) {
@@ -375,19 +396,50 @@ smStatus_t DoAPDUTx(
 #ifdef WITH_PLATFORM_SCP03
     apduStatus = Se05x_API_SCP03_TransmitData(session_ctx, hdr, cmdBuf, cmdBufLen, rspBuf, &rxBufLen, hasle);
 #else
-    (void)hasle;
-    if (cmdBufLen > 0) {
+
+    if ((hasle && cmdBufLen > 0) || cmdBufLen > 0xFF) { // Extended length APDU
+
+        // Format: CLA INS P1 P2 00 Lc(2 bytes) [Data]
+        if (cmdBufLen > 0xFFFF) {
+            return apduStatus;
+        }
+
+        // 7 additional bytes Extended tx case CLA INS P1 P2 00 Lc(2 bytes)
+        if (cmdBufLen > (MAX_APDU_BUFFER - 7)) {
+            return apduStatus;
+        }
+
+        // add header
+        memmove((cmdBuf + 7), cmdBuf, cmdBufLen);
+        memcpy(cmdBuf, hdr, 4);
+
+        cmdBuf[4] = 0x00;
+        cmdBuf[5] = (uint8_t)(cmdBufLen >> 8) & 0xFF; // Lc high byte
+        cmdBuf[6] = (uint8_t)cmdBufLen & 0xFF; // Lc low byte
+        cmdBufLen += 7; // Header(4) + Lc(3)
+        //this is a TX only method so LE isn't required
+    } else if (cmdBufLen > 0) {
+        // if cmdBufLen is larger than cmdBufLen we need a extedned case
+        if (cmdBufLen > 0xFF) {
+            return apduStatus;
+        }
+
+        if (cmdBufLen > (MAX_APDU_BUFFER - 5)) {
+            return apduStatus;
+        }
+
+        // add header + Lc
         memmove((cmdBuf + 5), cmdBuf, cmdBufLen);
         memcpy(cmdBuf, hdr, 4);
-        cmdBuf[4] = cmdBufLen;
-
-        ENSURE_OR_GO_EXIT((UINT_MAX - 5) >= cmdBufLen);
-        cmdBufLen += 5;
-    }
-    else {
+        cmdBuf[4] = cmdBufLen & 0xFF; // Lc
+        cmdBufLen += 5; // Header(4) + Lc(1)
+    } else {
+        // No command data (Case 1)
+        // Format: CLA INS P1 P2
         memcpy(cmdBuf, hdr, 4);
         cmdBufLen = 4;
     }
+
     apduStatus = smComT1oI2C_TransceiveRaw(session_ctx->conn_context, cmdBuf, cmdBufLen, rspBuf, &rxBufLen);
     if (rxBufLen >= 2) {
         apduStatus = rspBuf[(rxBufLen)-2] << 8 | rspBuf[(rxBufLen)-1];
@@ -418,18 +470,60 @@ smStatus_t DoAPDUTxRx(pSe05xSession_t session_ctx,
 #ifdef WITH_PLATFORM_SCP03
     apduStatus = Se05x_API_SCP03_TransmitData(session_ctx, hdr, cmdBuf, cmdBufLen, rspBuf, pRspBufLen, hasle);
 #else
-    (void)hasle;
-    if (cmdBufLen > 0) {
+    if (hasle && cmdBufLen > 0) { // Extended length APDU
+        
+        // Format: CLA INS P1 P2 00 Lc(2 bytes) [Data] Le(2 bytes)
+        if (cmdBufLen > 0xFFFF) {
+            return apduStatus;
+        }
+
+        if (cmdBufLen > (MAX_APDU_BUFFER - 9)) {
+            return apduStatus;
+        }
+
+        // add header
+        memmove((cmdBuf + 7), cmdBuf, cmdBufLen);
+        memcpy(cmdBuf, hdr, 4);
+
+        cmdBuf[4] = 0x00;
+        cmdBuf[5] = (uint8_t)(cmdBufLen >> 8) & 0xFF; // Lc high byte
+        cmdBuf[6] = (uint8_t)cmdBufLen & 0xFF; // Lc low byte
+        // Set Le: 0x0000 for maximum response length  AN12413 4.1.2 Le field must in any case be smaller than 0x8000
+        cmdBuf[7 + cmdBufLen] = (uint8_t)(MAX_APDU_BUFFER >> 8) & 0xFF; // Le high byte
+        cmdBuf[8 + cmdBufLen] = (uint8_t)(MAX_APDU_BUFFER)&0xFF; // Le low byte
+        cmdBufLen += 9; // Header(4) + Lc(3) + Le(2)
+    } else if (cmdBufLen > 0) {
+
+        if (cmdBufLen > 0xFF) {
+            return apduStatus;
+        }
+
+        if (cmdBufLen > (MAX_APDU_BUFFER - 5)) {
+            return apduStatus;
+        }
+
+        // add header + Lc
         memmove((cmdBuf + 5), cmdBuf, cmdBufLen);
         memcpy(cmdBuf, hdr, 4);
-        cmdBuf[4] = cmdBufLen;
-        ENSURE_OR_GO_EXIT((UINT_MAX - 5) >= cmdBufLen);
-        cmdBufLen += 5;
+        cmdBuf[4] = cmdBufLen & 0xFF; // Lc
+        cmdBufLen += 5; // Header(4) + Lc(1)
+    } else {
+        if(!hasle){
+            // No command data (Case 1)
+            // Format: CLA INS P1 P2
+            memcpy(cmdBuf, hdr, 4);
+            cmdBufLen = 4;
+        }else if(hasle && cmdBufLen == 0){
+            // No command data (Case 2E)
+            // Format: CLA INS P1 P2 00 (LE 2 Byte)
+            memcpy(cmdBuf, hdr, 4);
+            cmdBuf[4] = 0x00;
+            cmdBuf[5] = (uint8_t)(MAX_APDU_BUFFER >> 8) & 0xFF; // Le high byte
+            cmdBuf[6] = (uint8_t)(MAX_APDU_BUFFER)&0xFF; // Le low byte
+            cmdBufLen = 7;
+        }
     }
-    else {
-        memcpy(cmdBuf, hdr, 4);
-        cmdBufLen = 4;
-    }
+
     apduStatus = smComT1oI2C_TransceiveRaw(session_ctx->conn_context, cmdBuf, cmdBufLen, rspBuf, pRspBufLen);
     if (*pRspBufLen >= 2) {
         apduStatus = rspBuf[(*pRspBufLen) - 2] << 8 | rspBuf[(*pRspBufLen) - 1];
