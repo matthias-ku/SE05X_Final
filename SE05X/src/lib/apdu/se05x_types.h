@@ -14,6 +14,9 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "..\t1oi2c\phNxpEseProto7816_3.h"
+
+
 /* ********************** Constants ********************** */
 
 /** Plug and Trust Nano package version */
@@ -29,7 +32,7 @@
 #if defined(CONFIG_PLUGANDTRUST_APDU_BUFFER_SIZE) && CONFIG_PLUGANDTRUST_APDU_BUFFER_SIZE > 0
 #define MAX_APDU_BUFFER CONFIG_PLUGANDTRUST_APDU_BUFFER_SIZE
 #else
-#define MAX_APDU_BUFFER 170
+#define MAX_APDU_BUFFER 885 //According to Table 16. in AN12413 The APDU buffer is 894 bytes in total, the size here is however smaller, since Header, LC and LE get added later
 #endif
 
 /** NXP reserved object id */
@@ -107,6 +110,8 @@ typedef struct
     ];
 } tlvHeader_t;
 
+
+#define ADPU_BUFFER_RX_OFFSET (MAX_APDU_BUFFER + 9) //the upper half of the buffer is for RX thus the offest, 9 bytes = additonal 4bytes header, lc up to 3 bytes and the le 2 bytes
 /** Se05x session context */
 typedef struct
 {
@@ -115,7 +120,11 @@ typedef struct
     /** Set skip_applet_select = 1, to skip the se05x applet selection.*/
     uint8_t skip_applet_select;
     /** Apdu buffer used for Tx/Rx */
+    #ifdef T1oI2C_UM11225
+    uint8_t apdu_buffer[(MAX_APDU_BUFFER + 9)*2];    // when assembling the T1oI2C UM11225_SE050 Frames we need room for the header 4bytes, lc up to 3 bytes and the le 2 bytes , use upper half for rx
+#else
     uint8_t apdu_buffer[MAX_APDU_BUFFER];
+#endif
     /** PlatformSCP03 ENC key. Set to NULL in case of plain session */
     uint8_t *pScp03_enc_key;
     /** PlatformSCP03 ENC key length. Set to 0 in case of plain session */
@@ -162,6 +171,7 @@ typedef enum
     kSE05x_P1_PUBLIC    = 0x20,
     kSE05x_P1_DEFAULT   = 0x00,
     kSE05x_P1_EC        = 0x01,
+    kSE05x_P1_RSA       = 0x02,
     kSE05x_P1_AES       = 0x03,
     kSE05x_P1_DES       = 0x04,
     kSE05x_P1_HMAC      = 0x05,
@@ -201,6 +211,7 @@ typedef enum
     kSE05x_P2_GENERATE_ONESHOT = 0x45,
     kSE05x_P2_VALIDATE_ONESHOT = 0x46,
     kSE05x_P2_RANDOM          = 0x49,
+    kSE05x_P2_RAW             = 0x4F,
     kSE05x_P2_SCP             = 0x52,
 } SE05x_P2_t;
 
@@ -253,6 +264,39 @@ typedef enum
     kSE05x_KeyPart_Public = kSE05x_P1_PUBLIC,
 } SE05x_KeyPart_t;
 
+/** RSA Key format */
+typedef enum
+{
+    kSE05x_RSAKeyFormat_CRT = kSE05x_P2_DEFAULT,
+    kSE05x_RSAKeyFormat_RAW = kSE05x_P2_RAW,
+} SE05x_RSAKeyFormat_t;
+
+/** Algorithms for RSA Signature */
+typedef enum
+{
+    /** Invalid */
+    kSE05x_RSASignAlgo_NA = 0,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignAlgo_SHA1_PKCS1_PSS = 0x15,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignAlgo_SHA224_PKCS1_PSS = 0x2B,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignAlgo_SHA256_PKCS1_PSS = 0x2C,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignAlgo_SHA384_PKCS1_PSS = 0x2D,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignAlgo_SHA512_PKCS1_PSS = 0x2E,
+    /** RFC8017: RSASSA-PKCS1-v1_5 */
+    kSE05x_RSASignAlgo_SHA_224_PKCS1 = 0x27,
+    /** RFC8017: RSASSA-PKCS1-v1_5 */
+    kSE05x_RSASignAlgo_SHA_256_PKCS1 = 0x28,
+    /** RFC8017: RSASSA-PKCS1-v1_5 */
+    kSE05x_RSASignAlgo_SHA_384_PKCS1 = 0x29,
+    /** RFC8017: RSASSA-PKCS1-v1_5 */
+    kSE05x_RSASignAlgo_SHA_512_PKCS1 = 0x2A,
+} SE05x_RSASignAlgo_t;
+
+
 /** Different TAG Values to talk to SE05X IoT Applet */
 typedef enum
 {
@@ -290,6 +334,87 @@ typedef enum
     kSE05x_ECSignatureAlgo_SHA_384 = 0x22,
     kSE05x_ECSignatureAlgo_SHA_512 = 0x26,
 } SE05x_ECSignatureAlgo_t;
+
+/** Size of RSA Key Objects  */
+typedef enum {
+    /** Invalid */
+    kSE05x_RSABitLength_NA = 0,
+    kSE05x_RSABitLength_512 = 512,
+    kSE05x_RSABitLength_1024 = 1024,
+    kSE05x_RSABitLength_1152 = 1152,
+    kSE05x_RSABitLength_2048 = 2048,
+    kSE05x_RSABitLength_3072 = 3072,
+    kSE05x_RSABitLength_4096 = 4096,
+} SE05x_RSABitLength_t;
+
+/** Part of the RSA Key Objects  */
+typedef enum {
+    /** Invalid */
+    kSE05x_RSAKeyComponent_NA = 0xFF,
+    /** Modulus */
+    kSE05x_RSAKeyComponent_MOD = 0x00,
+    /** Public key exponent */
+    kSE05x_RSAKeyComponent_PUB_EXP = 0x01,
+    /** Private key exponent */
+    kSE05x_RSAKeyComponent_PRIV_EXP = 0x02,
+    /** CRT component p */
+    kSE05x_RSAKeyComponent_P = 0x03,
+    /** CRT component q */
+    kSE05x_RSAKeyComponent_Q = 0x04,
+    /** CRT component dp */
+    kSE05x_RSAKeyComponent_DP = 0x05,
+    /** CRT component dq */
+    kSE05x_RSAKeyComponent_DQ = 0x06,
+    /** CRT component q_inv */
+    kSE05x_RSAKeyComponent_INVQ = 0x07,
+} SE05x_RSAKeyComponent_t;
+
+/** Different signature algorithms for RSA */
+typedef enum
+{
+    /** Invalid */
+    kSE05x_RSASignatureAlgo_NA = 0,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignatureAlgo_SHA1_PKCS1_PSS = 0x15,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignatureAlgo_SHA224_PKCS1_PSS = 0x2B,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignatureAlgo_SHA256_PKCS1_PSS = 0x2C,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignatureAlgo_SHA384_PKCS1_PSS = 0x2D,
+    /** RFC8017: RSASSA-PSS */
+    kSE05x_RSASignatureAlgo_SHA512_PKCS1_PSS = 0x2E,
+    /** RFC8017: RSASSA-PKCS1-v1_5 */
+    kSE05x_RSASignatureAlgo_SHA1_PKCS1 = 0x0A,
+    /** RFC8017: RSASSA-PKCS1-v1_5 */
+    kSE05x_RSASignatureAlgo_SHA_224_PKCS1 = 0x27,
+    /** RFC8017: RSASSA-PKCS1-v1_5 */
+    kSE05x_RSASignatureAlgo_SHA_256_PKCS1 = 0x28,
+    /** RFC8017: RSASSA-PKCS1-v1_5 */
+    kSE05x_RSASignatureAlgo_SHA_384_PKCS1 = 0x29,
+    /** RFC8017: RSASSA-PKCS1-v1_5 */
+    kSE05x_RSASignatureAlgo_SHA_512_PKCS1 = 0x2A,
+} SE05x_RSASignatureAlgo_t;
+
+/** Public part of RSA Keys */
+typedef enum {
+    kSE05x_RSAPubKeyComp_NA = 0,
+    kSE05x_RSAPubKeyComp_MOD = kSE05x_RSAKeyComponent_MOD,
+    kSE05x_RSAPubKeyComp_PUB_EXP = kSE05x_RSAKeyComponent_PUB_EXP,
+} SE05x_RSAPubKeyComp_t;
+
+/** Different encryption/decryption algorithms for RSA */
+typedef enum
+{
+    /** Invalid */
+    kSE05x_RSAEncryptionAlgo_NA = 0,
+    /** Plain RSA, padding required on host. */
+    kSE05x_RSAEncryptionAlgo_NO_PAD = 0x0C,
+    /** RFC8017: RSAES-PKCS1-v1_5 */
+    kSE05x_RSAEncryptionAlgo_PKCS1 = 0x0A,
+    /** RFC8017: RSAES-OAEP */
+    kSE05x_RSAEncryptionAlgo_PKCS1_OAEP = 0x0F,
+} SE05x_RSAEncryptionAlgo_t;
 
 /** Result of operations */
 typedef enum
