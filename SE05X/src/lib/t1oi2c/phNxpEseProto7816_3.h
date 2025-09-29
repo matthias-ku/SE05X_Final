@@ -144,11 +144,11 @@ typedef struct iFrameInfo
     bool_t isChained;   /*!< I-frame: Indicates if more frames to follow in the same data packet or not */
     uint8_t *p_data;    /*!< I-frame: Actual data (Information field (INF)) */
     uint8_t seqNo;      /*!< I-frame: Sequence number of the I-frame */
-    uint8_t maxDataLen; /*!< I-frame: Maximum data length to be allowed in a single I-frame */
-    uint8_t dataOffset; /*!< I-frame: Offset to the actual data(INF) for the current frame of the packet */
-    uint8_t
+    uint32_t maxDataLen; /*!< I-frame: Maximum data length to be allowed in a single I-frame */
+    uint32_t dataOffset; /*!< I-frame: Offset to the actual data(INF) for the current frame of the packet */
+    uint32_t
         totalDataLen;    /*!< I-frame: Total data left in the packet, used to set the chained flag/calculating offset */
-    uint8_t sendDataLen; /*!< I-frame: the length of the I-frame actual data */
+    uint32_t sendDataLen; /*!< I-frame: the length of the I-frame actual data */
 } iFrameInfo_t;
 
 /*!
@@ -289,7 +289,7 @@ typedef struct phNxpEseProto7816_PCB_bits
 /*!
  * \brief Max. size of the frame that can be sent
  */
-#define IFSC_SIZE_SEND 254
+#define IFSC_SIZE_SEND (254 - PH_PROTO_7816_HEADER_LEN - PH_PROTO_7816_CRC_LEN) // we need to make sure that the Fames are samller than 255 bytes the ISO 7816 Header and crc get added as well so Information field size must be limited
 /*!
  * \brief Delay to be used before sending the next frame, after error reported by ESE
  */

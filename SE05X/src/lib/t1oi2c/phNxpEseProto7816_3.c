@@ -418,7 +418,8 @@ static bool_t phNxpEseProto7816_SendIframe(void *conn_ctx, iFrameInfo_t iFrameDa
 {
     bool_t status                    = FALSE;
     uint32_t frame_len               = 0;
-    uint8_t *p_framebuff             = iFrameData.p_data;
+    // we need multiple runs to send more than 254 bytes of data (split up into several frames)
+    uint8_t p_framebuff[IFSC_SIZE_SEND + PH_PROTO_7816_HEADER_LEN + PH_PROTO_7816_CRC_LEN];
     uint8_t pcb_byte                 = 0;
     uint16_t calc_crc                = 0;
     iFrameInfo_t *pNextTx_IframeInfo = &phNxpEseProto7816_3_Var.phNxpEseNextTx_Cntx.IframeInfo;
@@ -428,22 +429,22 @@ static bool_t phNxpEseProto7816_SendIframe(void *conn_ctx, iFrameInfo_t iFrameDa
         return FALSE;
     }
 
-    if (iFrameData.dataOffset != 0) {
-        T_SMLOG_I("%s Line: [%d] - dataOffset cannot be greater than zero, as max appdu buffer size is 128 ",
-            __FUNCTION__,
-            __LINE__);
-        return FALSE;
-    }
-
-    if ((iFrameData.sendDataLen + PH_PROPTO_7816_INF_BYTE_OFFSET) > MAX_APDU_BUFFER) {
+    // we need multiple runs to send more than 254 bytes of data (split up into several frames) thus in later runs the offset is greater than 0
+    if ((iFrameData.sendDataLen + PH_PROTO_7816_HEADER_LEN + PH_PROTO_7816_CRC_LEN) > MAX_APDU_BUFFER) {    //header and crc are added to the command
         T_SMLOG_I("%s Line: [%d] - APDU buffer is not long enough. ", __FUNCTION__, __LINE__);
         return FALSE;
     }
 
-    memmove(p_framebuff + PH_PROPTO_7816_INF_BYTE_OFFSET, p_framebuff, iFrameData.sendDataLen);
+    if ((iFrameData.sendDataLen + PH_PROTO_7816_HEADER_LEN + PH_PROTO_7816_CRC_LEN) > (IFSC_SIZE_SEND + PH_PROTO_7816_HEADER_LEN + PH_PROTO_7816_CRC_LEN)) {
+        T_SMLOG_I("%s Line: [%d] - Frame buffer is not long enough. ", __FUNCTION__, __LINE__);
+        return FALSE;
+    }
+
+    memmove(p_framebuff + PH_PROPTO_7816_INF_BYTE_OFFSET, &iFrameData.p_data[iFrameData.dataOffset], iFrameData.sendDataLen);
 
     /* This update is helpful in-case a R-NACK is transmitted from the MW */
     phNxpEseProto7816_3_Var.lastSentNonErrorframeType = IFRAME;
+    ENSURE_OR_GO_EXIT(iFrameData.sendDataLen <= (IFSC_SIZE_SEND));
     frame_len = (iFrameData.sendDataLen + PH_PROTO_7816_HEADER_LEN + PH_PROTO_7816_CRC_LEN);
 
     /* frame the packet */
@@ -456,13 +457,16 @@ static bool_t phNxpEseProto7816_SendIframe(void *conn_ctx, iFrameInfo_t iFrameDa
 
     /* Update the send seq no */
     pcb_byte |= (pNextTx_IframeInfo->seqNo << 6);
+    
+    // according to ISO/IEC 7816-3:2006 (11.3.2.2) bit 8 (MSB) is set to zero
+    pcb_byte = pcb_byte & 0x7F;
 
     /* store the pcb byte */
     p_framebuff[PH_PROPTO_7816_PCB_OFFSET] = pcb_byte;
 #if defined(T1oI2C_UM11225)
     /* store I frame length */
     /* for T1oI2C_UM11225 LEN field is of 1 byte*/
-    p_framebuff[PH_PROPTO_7816_LEN_UPPER_OFFSET] = iFrameData.sendDataLen;
+    p_framebuff[PH_PROPTO_7816_LEN_UPPER_OFFSET] = (uint8_t) iFrameData.sendDataLen;
 #elif defined(T1oI2C_GP1_0)
     /* store I frame length */
     /* for T1oI2C_GP1_0 LEN field is of 2 byte*/
@@ -479,6 +483,8 @@ static bool_t phNxpEseProto7816_SendIframe(void *conn_ctx, iFrameInfo_t iFrameDa
     status                     = phNxpEseProto7816_SendRawFrame(conn_ctx, frame_len, p_framebuff);
 
     return status;
+exit:
+    return ESESTATUS_FAILED;
 }
 
 /******************************************************************************
@@ -537,7 +543,7 @@ static bool_t phNxpEseProto7816_SetNextIframeContxt(void)
     phNxpEseProto7816_3_Var.phNxpEseProto7816_nextTransceiveState = SEND_IFRAME;
 
     pNextTx_IframeInfo->seqNo      = (uint8_t) (pLastTx_IframeInfo->seqNo ^ 1);
-    if((UINT8_MAX - pLastTx_IframeInfo->dataOffset) < pLastTx_IframeInfo->maxDataLen)
+    if((UINT_MAX - pLastTx_IframeInfo->dataOffset) < pLastTx_IframeInfo->maxDataLen) // adopted UINT_MAX from plug and trust library
     {
         return FALSE;
     }
@@ -670,7 +676,7 @@ static bool_t phNxpEseProto7816_RecoverySteps(void)
  ******************************************************************************/
 static void phNxpEseProto7816_DecodeSFrameData(uint8_t *p_data)
 {
-    uint8_t maxSframeLen = 0, frameOffset = 0;
+    uint32_t maxSframeLen = 0, frameOffset = 0;
 
     ENSURE_OR_GO_EXIT(p_data != NULL);
 #if defined(T1oI2C_UM11225)
@@ -1306,7 +1312,7 @@ bool_t phNxpEseProto7816_Transceive(void *conn_ctx, phNxpEse_data *pCmd, phNxpEs
         /* ESE hard reset to be done */
         T_SMLOG_E("%s Transceive failed, hard reset to proceed ", __FUNCTION__);
     }
-    if (pRx_EseCntx->responseBytesRcvd > UINT8_MAX) {
+    if (pRx_EseCntx->responseBytesRcvd > MAX_APDU_BUFFER) {
         return FALSE;
     }
     pRsp->len                                              = pRx_EseCntx->responseBytesRcvd;
