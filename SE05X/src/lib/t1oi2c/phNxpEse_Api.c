@@ -40,7 +40,8 @@ static int poll_sof_chained_delay = 0;
 
 /* ESE Context structure */
 phNxpEse_Context_t gnxpese_ctxt;
-static uint8_t t10i2c_tempBuf[48] = {
+//must be able to buffer a full rseponse
+static uint8_t t10i2c_tempBuf[260] = {
     0,
 };
 phNxpEse_data gRsp = {
@@ -393,7 +394,7 @@ ESESTATUS phNxpEse_read(void *conn_ctx, uint32_t *data_len, uint8_t **pp_data)
 {
     ESESTATUS status                = ESESTATUS_FAILED;
     int ret                         = -1;
-    uint8_t rspBufLen               = 0;
+    uint32_t rspBufLen               = 0;
     phNxpEse_Context_t *nxpese_ctxt = (conn_ctx == NULL) ? &gnxpese_ctxt : (phNxpEse_Context_t *)conn_ctx;
 
     T_SMLOG_D("%s Enter ..", __FUNCTION__);
@@ -551,9 +552,27 @@ static int phNxpEse_readPacket(void *conn_ctx, void *pDevHandle, uint8_t *pBuffe
         total_count    = 4;
         nNbBytesToRead = (pBuffer[2] << 8 & 0xFF) | (pBuffer[3] & 0xFF);
 #endif
-        /* Read the Complete data + two byte CRC*/
-        ret =
-            phPalEse_i2c_read(pDevHandle, &pBuffer[PH_PROTO_7816_HEADER_LEN], (nNbBytesToRead + PH_PROTO_7816_CRC_LEN));
+        /* Read the Complete data + two byte CRC*/        
+        // We might have to read 2 times since nNbBytesToRead + PH_PROTO_7816_CRC_LEN might exceed IFSC_SIZE_SEND 
+        // IFSC_SIZE_SEND is not only limited by the ISO 7816 but also the 255 byte limit of the wire.h
+        
+        int bytesReadBuf = 0;
+        int remainingBytes = nNbBytesToRead + PH_PROTO_7816_CRC_LEN;
+
+        while (remainingBytes > 0) {
+            int chunkSize = (remainingBytes > IFSC_SIZE_SEND) ? IFSC_SIZE_SEND : remainingBytes;
+            ret = phPalEse_i2c_read(pDevHandle, &pBuffer[PH_PROTO_7816_HEADER_LEN + bytesReadBuf], chunkSize);
+
+            if (ret < 0) {
+                T_SMLOG_D("_i2c_read() ret : %X", ret);
+                ret = -1;
+                break;
+            }
+
+            bytesReadBuf += chunkSize;
+            remainingBytes -= chunkSize;
+        }
+
         if (ret < 0) {
             T_SMLOG_D("_i2c_read() ret : %X", ret);
             ret = -1;
@@ -592,7 +611,7 @@ ESESTATUS phNxpEse_WriteFrame(void *conn_ctx, uint32_t data_len, const uint8_t *
     /* Create local copy of cmd_data */
     T_SMLOG_D("%s Enter ..", __FUNCTION__);
 
-    if (data_len > UINT8_MAX){
+    if (data_len > MAX_APDU_BUFFER){
         return ESESTATUS_FAILED;
     }
 

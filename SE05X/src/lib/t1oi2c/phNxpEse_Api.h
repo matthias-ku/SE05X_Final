@@ -37,7 +37,7 @@ typedef enum
  */
 typedef struct phNxpEse_data
 {
-    uint8_t len;     /*!< length of the buffer */
+    uint32_t len;     /*!< length of the buffer */
     uint8_t *p_data; /*!< pointer to a buffer */
 } phNxpEse_data;
 

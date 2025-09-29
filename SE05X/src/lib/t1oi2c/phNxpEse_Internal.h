@@ -43,7 +43,7 @@ typedef enum
 typedef struct phNxpEse_Context
 {
     uint8_t *p_read_buff;
-    uint8_t cmd_len;
+    uint32_t cmd_len;
     uint8_t *p_cmd_data;
     phNxpEse_LibStatus EseLibStatus; /* Indicate if Ese Lib is open or closed */
     phNxpEse_initParams initParams;
