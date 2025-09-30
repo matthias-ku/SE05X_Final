@@ -239,6 +239,23 @@ public:
      */
     int Sign(int keyID, const byte hash[], size_t hashLen, byte sig[], size_t maxSigLen, size_t* sigLen);
 
+    /** Sign
+     *
+     * Computes RSA signature using key stored in KeyID SE050 object.
+     * Output buffer is filled with the signature in DER format
+     *
+     * SHA256 -> private Key -> Signature
+     *
+     * @param[in] keyID SE050 object ID containing the key
+     * @param[in] encodedHash Input RSASSA-PKCS1-v1_5 or RSASSA-PSS encoded hash used to compute the signature
+     * @param[in] encodedHashLen RSASSA-PKCS1-v1_5 or RSASSA-PSS length
+     * @param[out] sig Output buffer containing the signature
+     * @param[in] maxSigLen Output buffer size
+     * @param[out] sigLen signature length
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int SignRSA(int keyID, const byte encodedHash[], size_t encodedHashLen, byte sig[], size_t maxSigLen, size_t* sigLen);
     /** Verify
      *
      * Verify ECDSA signature using key stored in KeyID SE050 object.
@@ -256,6 +273,24 @@ public:
      * @return 0 on Failure (Not match) 1 on Success (Match)
      */
     int Verify(int keyID, const byte hash[], size_t hashLen, const byte sig[],size_t sigLen);
+
+    /** Verify
+     *
+     * Verify RSASSA_PKCS1 signature using key stored in KeyID SE050 object.
+     *
+     *                               Input pkcs1_v15_encoded hash
+     *                                             ? Match ?
+     * Signature -> public Key -> pkcs1_v15_encoded hash
+     *
+     * @param[in] keyID SE050 object ID containing the key
+     * @param[in] encodedHash Input pkcs1_v15_encoded hash used to compute the signature (the method pkcs1_v15_encode can be used to generate the encoded hash)
+     * @param[in] encodedHashLen pkcs1_v15_encoded hash length
+     * @param[in] sig Input buffer containint the signature
+     * @param[in] sigLen signature length
+     *
+     * @return 0 on Failure (Not match) 1 on Success (Match)
+     */
+    int VerifyRSASSA_PKCS1(int keyID, const byte encodedHash[], size_t encodedHashLen, const byte sig[], size_t sigLen);
 
     /** readBinaryObject
      *
@@ -479,6 +514,77 @@ public:
      * @return 0 on Failure 1 on Success
      */
     int writeSlot(int slot, const byte data[], int length);
+
+    /** pkcs1_v15_encode
+     *
+     * The hash to the buffer in the RSASSA-PKCS1-v1_5 format.
+     *
+     * @param[in] ObjectId SE050 object ID
+     * @param[in] data Input data buffer
+     * @param[in] length Number of bytes to write
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int pkcs1_v15_encode(uint8_t* hash, size_t hashlen, uint8_t* out, size_t* outLen, SE05x_RSASignatureAlgo_t rsaSignAlgo, SE05x_RSABitLength_t keyLength);
+    
+    /** RSAEncryptOAEP
+     *
+     * Enrypts message with RSA using OAEP padding
+     * hash digest size = 20 bytes (SHA1 as specified in AN12413 4.3.14)
+     *
+     * @param[in] keyID SE050 key ID
+     * @param[in] message Input data buffer
+     * @param[in] messageLen Input data buffer size: must be less than ((RSA modulus - 2) - (2 * (hash digest size); (256 - 2) - (2*20) = 214 bytes for 2048bit keys
+     * @param[out] cipher Output data buffer: must be greater or equal as RSA modulus
+     * @param[out] cipherLen Output data buffer size (depending on the key size)
+     * @param[in] cipherMaxLen Output data buffer size 
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int RSAEncryptOAEP(int keyID, const byte message[], size_t messageLen, byte cipher[], size_t* cipherLen, size_t cipherMaxLen);
+    /** RSAEncryptRAW
+     *
+     * Enrypts message with RSA using no dedicated padding
+     *
+     * @param[in] keyID SE050 key ID
+     * @param[in] message Input data buffer
+     * @param[in] messageLen Input data buffer size: must be less than RSA modulus
+     * @param[out] cipher Output data buffer: must be greater or equal as RSA modulus
+     * @param[out] cipherLen Output data buffer size (depending on the key size)
+     * @param[in] cipherMaxLen Output data buffer size
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int RSAEncryptRAW(int keyID, const byte message[], size_t messageLen, byte cipher[], size_t* cipherLen, size_t cipherMaxLen);
+    /** RSADecryptOAEP
+     *
+     * Enrypts cipher with RSA using OAEP padding
+     *
+     * @param[in] keyID SE050 key ID
+     * @param[out] message Output data buffer
+     * @param[out] messageLen length of the message output
+     * @param[in] cipher Input data buffer
+     * @param[in] cipherLen Input data buffer size
+     * @param[in] messageMaxLen Output data buffer size
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int RSADecryptOAEP(int keyID, byte message[], size_t* messageLen, size_t messageMaxLen, const byte cipher[], size_t cipherLen);
+    /** RSADecryptRAW
+     *
+     * Enrypts cipher with RSA no padding
+     *
+     * @param[in] keyID SE050 key ID
+     * @param[out] message Output data buffer
+     * @param[out] messageLen length of the message output
+     * @param[in] cipher Input data buffer
+     * @param[in] cipherLen Input data buffer size
+     * @param[in] messageMaxLen Output data buffer size
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int RSADecryptRAW(int keyID, byte message[], size_t* messageLen, size_t messageMaxLen, const byte cipher[], size_t cipherLen);
+
 
     inline int locked() { return 1; }
     inline int lock() { return 1; }

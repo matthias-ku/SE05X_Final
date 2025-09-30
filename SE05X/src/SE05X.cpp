@@ -70,7 +70,11 @@
 
 #define SE05X_SHA256_LENGTH              32
 
+#define SE05X_SHA1_LENGTH                20
+
 #define SE05X_OEAP_SHA_256_OVERHEAD ((SE05X_SHA256_LENGTH * 2) + 2)
+
+#define SE05X_OEAP_SHA_1_OVERHEAD ((SE05X_SHA1_LENGTH * 2) + 2)
 
 #define SE05X_MIN_SIGNATURE_LENGTH       128    //Min length for RSA Signatures
 
@@ -989,6 +993,61 @@ int SE05XClass::Sign(int keyID, const byte hash[], size_t hashLen, byte sig[], s
     return 1;
 }
 
+int SE05XClass::SignRSA(int keyID, const byte encodedHash[], size_t encodedHashLen, byte sig[], size_t sigMaxLen, size_t* sigLen)
+{
+    smStatus_t     status;
+    SE05x_Result_t result;
+    uint16_t       key_size = 0;
+
+    status = Se05x_API_CheckObjectExists(&_se05x_session, keyID, &result);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_CheckObjectExists \n");
+        *sigLen = 0;
+        return 0;
+    }
+
+    if (result != kSE05x_Result_SUCCESS)
+    {
+        SMLOG_E("Object not exists \n");
+        *sigLen = 0;
+        return 0;
+    }
+
+    status = Se05x_API_ReadSize(&_se05x_session, keyID, &key_size);
+    if (status != SM_OK)
+    {
+        return 0;
+    }
+
+    if (sigMaxLen < key_size)
+    {
+        SMLOG_E("Error in Sign: signature buffer too small \n");
+        *sigLen = 0;
+        return 0;
+    }
+
+    if (key_size < encodedHashLen)
+    {
+        SMLOG_E("Error in Sign: encoded hash input is too large \n");
+        *sigLen = 0;
+        return 0;
+    }
+
+    *sigLen = key_size;
+
+    status = Se05x_API_RSADecrypt(&_se05x_session, keyID, kSE05x_RSAEncryptionAlgo_NO_PAD, encodedHash, encodedHashLen,
+                                  sig, sigLen);
+
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_RSASign \n");
+        return 0;
+    }
+
+    return 1;
+}
+
 int SE05XClass::ecSign(int slot, const byte message[], byte signature[])
 {
     byte signatureDer[SE05X_EC_SIGNATURE_MAX_DER_LENGTH];
@@ -1046,6 +1105,73 @@ int SE05XClass::Verify(int keyID, const byte hash[], size_t hashLen, const byte 
         return 0;
     }
     return 1;
+}
+
+int SE05XClass::VerifyRSASSA_PKCS1(int keyID, const byte encodedHash[], size_t encodedHashLen, const byte sig[], size_t sigLen)
+{
+    smStatus_t     status;
+    SE05x_Result_t result;
+    uint16_t       key_size = 0;
+    
+    //check if the key exists
+    status = Se05x_API_CheckObjectExists(&_se05x_session, keyID, &result);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_CheckObjectExists \n");
+        return 0;
+    }
+
+    if (result != kSE05x_Result_SUCCESS)
+    {
+        SMLOG_E("Object not exists \n");
+        return 0;
+    }
+
+    // get the key length stored under the keyID
+    status = Se05x_API_ReadSize(&_se05x_session, keyID, &key_size);
+    if (status != SM_OK)
+    {
+        return 0;
+    }
+
+    if ((encodedHashLen < SE05X_MIN_SIGNATURE_LENGTH) || (encodedHashLen > SE05X_MAX_SIGNATURE_LENGTH) || (encodedHashLen != key_size))
+    {
+        SMLOG_E("Error in VerifyRSASSA_PKCS1: invalid encodedHash buffer size\n");
+        return 0;
+    }
+
+    if ((sigLen < SE05X_MIN_SIGNATURE_LENGTH) || (sigLen > SE05X_MAX_SIGNATURE_LENGTH) || (sigLen != key_size))
+    {
+        SMLOG_E("Error in VerifyRSASSA_PKCS1: invalid signature length\n");
+        return 0;
+    }
+
+    
+    
+                                 
+    static uint8_t dec_data[512] = {0,}; 
+    size_t dec_len = sizeof(dec_data);
+
+    status = Se05x_API_RSAEncrypt(&_se05x_session, keyID, kSE05x_RSAEncryptionAlgo_NO_PAD, sig, sigLen, dec_data,
+                                  &dec_len);
+
+    if (status == SM_OK)
+    {
+        if (memcmp(dec_data, encodedHash, encodedHashLen) == 0)
+        {
+            return 1;
+        }else{
+            return 0;
+        }
+    }
+
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_RSAVerify \n");
+        return 0;
+    }
+
+    return 0;
 }
 
 int SE05XClass::ecdsaVerify(const byte message[], const byte signature[], const byte pubkey[])
@@ -1434,6 +1560,394 @@ int SE05XClass::setECSignatureRsValuesInDER(const byte* rawSignature, size_t raw
     signature[38] = 0x21;
     signature[39] = 0x00;
     memcpy(&signature[40], &rawSignature[halfSigLen], halfSigLen);
+
+    return 1;
+}
+
+int SE05XClass::RSAEncryptOAEP(int keyID, const byte message[], size_t messageLen, byte cipher[], size_t* cipherLen, size_t cipherMaxLen)
+{
+    smStatus_t     status;
+    SE05x_Result_t result;
+
+    uint16_t key_size = 0;
+
+    status = Se05x_API_CheckObjectExists(&_se05x_session, keyID, &result);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_CheckObjectExists \n");
+        return 0;
+    }
+
+    if (result != kSE05x_Result_SUCCESS)
+    {
+        SMLOG_E("Object not exists \n");
+        return 0;
+    }
+
+    status = Se05x_API_ReadSize(&_se05x_session, keyID, &key_size);
+    if (status != SM_OK)
+    {
+        return 0;
+    }
+
+    if (messageLen > (key_size - SE05X_OEAP_SHA_1_OVERHEAD))
+    {
+        SMLOG_E("Message too long \n");
+        return 0;
+    }
+
+    if (cipherMaxLen < (key_size))
+    {
+        SMLOG_E("Cipher buffer too short \n");
+        return 0;
+    }
+
+
+    if ((cipherMaxLen < SE05X_MIN_SIGNATURE_LENGTH) || (cipherMaxLen > SE05X_MAX_SIGNATURE_LENGTH))
+    {
+        SMLOG_E("Error Cipher length \n");
+        return 0;
+    }
+
+    *cipherLen = cipherMaxLen;
+
+    status = Se05x_API_RSAEncrypt(&_se05x_session, keyID, kSE05x_RSAEncryptionAlgo_PKCS1_OAEP, message, messageLen,
+                                  cipher, cipherLen);
+
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_RSAEncrypt \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::RSAEncryptRAW(int keyID, const byte message[], size_t messageLen, byte cipher[], size_t* cipherLen, size_t cipherMaxLen)
+{
+    smStatus_t     status;
+    SE05x_Result_t result;
+
+    uint16_t key_size = 0;
+
+    status = Se05x_API_CheckObjectExists(&_se05x_session, keyID, &result);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_CheckObjectExists \n");
+        return 0;
+    }
+
+    if (result != kSE05x_Result_SUCCESS)
+    {
+        SMLOG_E("Object not exists \n");
+        return 0;
+    }
+
+    status = Se05x_API_ReadSize(&_se05x_session, keyID, &key_size);
+    if (status != SM_OK)
+    {
+        return 0;
+    }
+
+    if (messageLen > key_size)
+    {
+        SMLOG_E("Message too long \n");
+        return 0;
+    }
+
+    if (cipherMaxLen < (key_size))
+    {
+        SMLOG_E("Cipher buffer too short \n");
+        return 0;
+    }
+
+    if ((messageLen < SE05X_MIN_SIGNATURE_LENGTH) || (messageLen > SE05X_MAX_SIGNATURE_LENGTH))
+    {
+        SMLOG_E("Error Message length \n");
+        return 0;
+    }
+
+    if ((cipherMaxLen < SE05X_MIN_SIGNATURE_LENGTH) || (cipherMaxLen > SE05X_MAX_SIGNATURE_LENGTH))
+    {
+        SMLOG_E("Error Cipher length \n");
+        return 0;
+    }
+
+    *cipherLen = cipherMaxLen;
+
+    status = Se05x_API_RSAEncrypt(&_se05x_session, keyID, kSE05x_RSAEncryptionAlgo_NO_PAD, message, messageLen, cipher,
+                                  cipherLen);
+
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_RSAEncrypt \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::RSADecryptOAEP(int keyID, byte message[], size_t* messageLen, size_t messageMaxLen, const byte cipher[], size_t cipherLen)
+{
+    smStatus_t     status;
+    SE05x_Result_t result;
+
+    uint16_t key_size = 0;
+
+    status = Se05x_API_CheckObjectExists(&_se05x_session, keyID, &result);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_CheckObjectExists \n");
+        return 0;
+    }
+
+    if (result != kSE05x_Result_SUCCESS)
+    {
+        SMLOG_E("Object not exists \n");
+        return 0;
+    }
+
+    status = Se05x_API_ReadSize(&_se05x_session, keyID, &key_size);
+    if (status != SM_OK)
+    {
+        return 0;
+    }
+
+    if (cipherLen > (key_size))
+    {
+        SMLOG_E("Cipher too long \n");
+        return 0;
+    }
+
+    if (messageMaxLen < (key_size))
+    {
+        SMLOG_E("Message buffer too short \n");
+        return 0;
+    }
+
+    *messageLen = messageMaxLen;
+
+    status = Se05x_API_RSADecrypt(&_se05x_session, keyID, kSE05x_RSAEncryptionAlgo_PKCS1_OAEP, cipher, cipherLen,
+                                  message, messageLen);
+
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_RSADecrypt \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::RSADecryptRAW(int keyID, byte message[], size_t* messageLen, size_t messageMaxLen, const byte cipher[], size_t cipherLen)
+{
+    smStatus_t     status;
+    SE05x_Result_t result;
+
+    uint16_t key_size = 0;
+
+    status = Se05x_API_CheckObjectExists(&_se05x_session, keyID, &result);
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_CheckObjectExists \n");
+        return 0;
+    }
+
+    if (result != kSE05x_Result_SUCCESS)
+    {
+        SMLOG_E("Object not exists \n");
+        return 0;
+    }
+
+    status = Se05x_API_ReadSize(&_se05x_session, keyID, &key_size);
+    if (status != SM_OK)
+    {
+        return 0;
+    }
+
+    if (cipherLen > (key_size))
+    {
+        SMLOG_E("Cipher too long \n");
+        return 0;
+    }
+
+    if (messageMaxLen < (key_size))
+    {
+        SMLOG_E("Message buffer too short \n");
+        return 0;
+    }
+
+    *messageLen = messageMaxLen;
+
+    status = Se05x_API_RSADecrypt(&_se05x_session, keyID, kSE05x_RSAEncryptionAlgo_NO_PAD, cipher, cipherLen, message,
+                                  messageLen);
+
+    if (status != SM_OK)
+    {
+        SMLOG_E("Error in Se05x_API_RSADecrypt \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+/*
+ * Return:  1-Success, 0-Error
+ */
+int SE05XClass::pkcs1_v15_encode(uint8_t*                 hash,
+                                 size_t                   hashlen,
+                                 uint8_t*                 out,
+                                 size_t*                  outLen,
+                                 SE05x_RSASignatureAlgo_t rsaSignAlgo,
+                                 SE05x_RSABitLength_t     keyLength)
+{
+    size_t         oid_size = 0;
+    size_t         nb_pad   = 0;
+    unsigned char* p        = out;
+    /* clang-format off */
+    unsigned char oid1[16] = { 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, };
+    /* clang-format on */
+    size_t     outlength      = 0;
+    smStatus_t ret_val        = SM_NOT_OK;
+
+    /* Constants */
+    const uint8_t RSA_Sign          = 0x01;
+    const uint8_t ASN1_sequence     = 0x10;
+    const uint8_t ASN1_constructed  = 0x20;
+    const uint8_t ASN1_oid          = 0x06;
+    const uint8_t ASN1_null         = 0x05;
+    const uint8_t ASN1_octat_string = 0x04;
+
+    if (keyLength == kSE05x_RSABitLength_512 || keyLength == kSE05x_RSABitLength_1024
+        || keyLength == kSE05x_RSABitLength_1152 || keyLength == kSE05x_RSABitLength_2048
+        || keyLength == kSE05x_RSABitLength_3072 || keyLength == kSE05x_RSABitLength_4096)
+    {
+        outlength = ((uint16_t) keyLength / 8);
+    }else{
+        return 0;
+    }
+        
+    nb_pad = outlength;
+
+
+    switch (rsaSignAlgo)
+    {
+    case kSE05x_RSASignatureAlgo_SHA1_PKCS1:
+        oid1[0]  = 0x2b;
+        oid1[1]  = 0x0e;
+        oid1[2]  = 0x03;
+        oid1[3]  = 0x02;
+        oid1[4]  = 0x1a;
+        oid_size = 5;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA_224_PKCS1:
+        oid1[8]  = 0x04;
+        oid_size = 9;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA_256_PKCS1:
+        oid1[8]  = 0x01;
+        oid_size = 9;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA_384_PKCS1:
+        oid1[8]  = 0x02;
+        oid_size = 9;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA_512_PKCS1:
+        oid1[8]  = 0x03;
+        oid_size = 9;
+        break;
+    default: return 0;
+    }
+
+    if (outlength < (hashlen + oid_size + 6 /* DigestInfo TLV overhead */))
+    {
+        return 0;
+    }
+
+    if (*outLen < outlength)
+    {
+        return 0;
+    }
+    *outLen = outlength;
+
+    /* Double-check that 8 + hashlen + oid_size can be used as a
+     * 1-byte ASN.1 length encoding and that there's no overflow. */
+    if (8 + hashlen + oid_size >= 0x80)
+    {
+        return 0;
+    }
+
+    /*
+     * Static bounds check:
+     * - Need 10 bytes for five tag-length pairs.
+     *   (Insist on 1-byte length encodings to protect against variants of
+     *    Bleichenbacher's forgery attack against lax PKCS#1v1.5 verification)
+     * - Need hashlen bytes for hash
+     * - Need oid_size bytes for hash alg OID.
+     */
+    if (hashlen > (SIZE_MAX - (10 + oid_size)))
+    {
+        return 0;
+    }
+    if (nb_pad < 10 + hashlen + oid_size)
+    {
+        return 0;
+    }
+    nb_pad -= 10 + hashlen + oid_size;
+
+    /* Need space for signature header and padding delimiter (3 bytes),
+     * and 8 bytes for the minimal padding */
+    if (nb_pad < 3 + 8)
+    {
+        return 0;
+    }
+    nb_pad -= 3;
+
+    /* Now nb_pad is the amount of memory to be filled
+     * with padding, and at least 8 bytes long. */
+
+    /* Write signature header and padding */
+    *p++ = 0;
+    *p++ = RSA_Sign;
+    memset(p, 0xFF, nb_pad);
+    p += nb_pad;
+    *p++ = 0;
+
+    /* Signing hashed data, add corresponding ASN.1 structure
+     *
+     * DigestInfo ::= SEQUENCE {
+     *   digestAlgorithm DigestAlgorithmIdentifier,
+     *   digest Digest }
+     * DigestAlgorithmIdentifier ::= AlgorithmIdentifier
+     * Digest ::= OCTET STRING
+     *
+     * Schematic:
+     * TAG-SEQ + LEN [ TAG-SEQ + LEN [ TAG-OID  + LEN [ OID  ]
+     *                                 TAG-NULL + LEN [ NULL ] ]
+     *                 TAG-OCTET + LEN [ HASH ] ]
+     */
+    *p++ = ASN1_sequence | ASN1_constructed;
+    *p++ = (unsigned char) (0x08 + oid_size + hashlen);
+    *p++ = ASN1_sequence | ASN1_constructed;
+    *p++ = (unsigned char) (0x04 + oid_size);
+    *p++ = ASN1_oid;
+    *p++ = (unsigned char) oid_size;
+    memcpy(p, oid1, oid_size);
+    p += oid_size;
+    *p++ = ASN1_null;
+    *p++ = 0x00;
+    *p++ = ASN1_octat_string;
+    *p++ = (unsigned char) hashlen;
+    memcpy(p, hash, hashlen);
+    p += hashlen;
+
+    /* Just a sanity-check, should be automatic
+     * after the initial bounds check. */
+    if (p != out + outlength)
+    {
+        memset(out, 0, outlength);
+        return 0;
+    }
 
     return 1;
 }
