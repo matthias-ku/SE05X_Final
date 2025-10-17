@@ -173,6 +173,68 @@ public:
      */
     int importPublicKey(int keyID, const byte publicKey[], size_t keyLen);
 
+    /** beginSHA1
+     *
+     * Initialize digest context to start a new SHA1 computation.
+     *
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int beginSHA1();
+
+    /** updateSHA1
+     *
+     * Updates SHA1 adding new data to the previous iterations
+     *
+     * @param[in] in Input data buffer
+     * @param[in] inLen Input data length
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int updateSHA1(const byte in[], size_t inLen);
+
+    /** endSHA1
+     *
+     * Get SHA1 data and cleanup digest context
+     *
+     * @param[out] out Output data buffer
+     * @param[in,out] outLen Size of output data buffer, SHA1 length
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int endSHA1(byte out[], size_t* outLen);
+
+    /** beginSHA224
+     *
+     * Initialize digest context to start a new SHA224 computation.
+     *
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int beginSHA224();
+
+    /** updateSHA224
+     *
+     * Updates SHA224 adding new data to the previous iterations
+     *
+     * @param[in] in Input data buffer
+     * @param[in] inLen Input data length
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int updateSHA224(const byte in[], size_t inLen);
+
+    /** endSHA224
+     *
+     * Get SHA224 data and cleanup digest context
+     *
+     * @param[out] out Output data buffer
+     * @param[in,out] outLen Size of output data buffer, SHA224 length
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int endSHA224(byte out[], size_t* outLen);
+
     /** beginSHA256
      *
      * Initialize digest context to start a new SHA256 computation.
@@ -217,6 +279,68 @@ public:
      * @return 0 on Failure 1 on Success
      */
     int SHA256(const byte in[], size_t inLen, byte out[], size_t outMaxLen, size_t* outLen);
+
+    /** beginSHA384
+     *
+     * Initialize digest context to start a new SHA384 computation.
+     *
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int beginSHA384();
+
+    /** updateSHA384
+     *
+     * Updates SHA384 adding new data to the previous iterations
+     *
+     * @param[in] in Input data buffer
+     * @param[in] inLen Input data length
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int updateSHA384(const byte in[], size_t inLen);
+
+    /** endSHA384
+     *
+     * Get SHA384 data and cleanup digest context
+     *
+     * @param[out] out Output data buffer
+     * @param[in,out] outLen Size of output data buffer, SHA384 length
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int endSHA384(byte out[], size_t* outLen);
+
+    /** beginSHA512
+     *
+     * Initialize digest context to start a new SHA512 computation.
+     *
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int beginSHA512();
+
+    /** updateSHA512
+     *
+     * Updates SHA512 adding new data to the previous iterations
+     *
+     * @param[in] in Input data buffer
+     * @param[in] inLen Input data length
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int updateSHA512(const byte in[], size_t inLen);
+
+    /** endSHA512
+     *
+     * Get SHA512 data and cleanup digest context
+     *
+     * @param[out] out Output data buffer
+     * @param[in,out] outLen Size of output data buffer, SHA512 length
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int endSHA512(byte out[], size_t* outLen);
 
     /** Sign
      *
@@ -584,7 +708,19 @@ public:
      * @return 0 on Failure 1 on Success
      */
     int RSADecryptRAW(int keyID, byte message[], size_t* messageLen, size_t messageMaxLen, const byte cipher[], size_t cipherLen);
-
+    /** mgf1
+     *
+     * Generates mgf1 mask
+     *
+     * @param[in] mgfSeed pointer to the seed data buffer
+     * @param[in] seedLen length of the seed data buffer
+     * @param[out] mask Output data buffer of the mask (the buffer size must be greater or equal to maskLen)
+     * @param[out] maskLen length of the mask output
+     * @param[in] hLen hLen must be the output size in bytes of a accepted hashing algo (SHA1=20,SHA224=28,SHA256=32,SHA384=48,SHA512=64) 
+     *
+     * @return 0 on Failure 1 on Success
+     */
+    int mgf1(uint8_t* mgfSeed, size_t seedLen, uint8_t* mask, uint64_t* maskLen, size_t hLen);
 
     inline int locked() { return 1; }
     inline int lock() { return 1; }
@@ -596,6 +732,9 @@ private:
     static int setECKeyXyVauesInDER(const byte* rawKey, size_t rawLen, byte* derKey, size_t* derLen);
     static int getECSignatureRsValuesFromDER(byte* derSignature, size_t derLen, byte* rawSignature, size_t* rawLen);
     static int setECSignatureRsValuesInDER(const byte* rawSignature, size_t rawLen, byte* signature, size_t* derLen);
+    int I2OSP(uint8_t*  out,
+        uint64_t        xLen,
+        uint64_t        x);
 
     Se05xSession_t _se05x_session;
 };

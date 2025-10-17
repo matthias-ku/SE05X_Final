@@ -68,7 +68,12 @@
 #define SE05X_EC_SIGNATURE_MIN_DER_LENGTH    SE05X_EC_SIGNATURE_MIN_HEADER_LENGTH + \
                                              SE05X_EC_SIGNATURE_RAW_LENGTH
 
+#define SE05X_SHA1_LENGTH                20
+#define SE05X_SHA224_LENGTH              28
 #define SE05X_SHA256_LENGTH              32
+#define SE05X_SHA384_LENGTH              48
+#define SE05X_SHA512_LENGTH              64
+
 
 #define SE05X_SHA1_LENGTH                20
 
@@ -883,6 +888,118 @@ int SE05XClass::importPublicKey(int keyID, const byte publicKey[], size_t keyLen
     return 1;
 }
 
+int SE05XClass::beginSHA1()
+{
+    smStatus_t      status;
+    SE05x_CryptoModeSubType_t subtype;
+
+    subtype.digest = kSE05x_DigestMode_SHA;
+
+    status = Se05x_API_CreateCryptoObject(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA, kSE05x_CryptoContext_DIGEST, subtype);
+    if (status != SM_OK) {
+        SMLOG_W("Se05x_API_CreateCryptoObject failed. Object already exists? \n");
+    }
+
+    status = Se05x_API_DigestInit(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestInit \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::updateSHA1(const byte in[], size_t inLen)
+{
+    smStatus_t      status;
+
+    status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA, in, inLen);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestUpdate \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::endSHA1(byte out[], size_t* outLen)
+{
+    smStatus_t      status;
+
+    if (*outLen < SE05X_SHA1_LENGTH) {
+        SMLOG_E("Error in endSHA1 \n");
+        *outLen = 0;
+        return 0;
+    }
+
+    status = Se05x_API_DigestFinal(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA, NULL, 0, out, outLen);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestFinal \n");
+        *outLen = 0;
+        return 0;
+    }
+
+    status = Se05x_API_DeleteCryptoObject(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA);
+
+    return 1;
+}
+
+int SE05XClass::beginSHA224()
+{
+    smStatus_t      status;
+    SE05x_CryptoModeSubType_t subtype;
+
+    subtype.digest = kSE05x_DigestMode_SHA224;
+
+    status = Se05x_API_CreateCryptoObject(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA224, kSE05x_CryptoContext_DIGEST, subtype);
+    if (status != SM_OK) {
+        SMLOG_W("Se05x_API_CreateCryptoObject failed. Object already exists? \n");
+    }
+
+    status = Se05x_API_DigestInit(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA224);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestInit \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::updateSHA224(const byte in[], size_t inLen)
+{
+    smStatus_t      status;
+
+    status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA224, in, inLen);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestUpdate \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::endSHA224(byte out[], size_t* outLen)
+{
+    smStatus_t      status;
+
+    if (*outLen < SE05X_SHA224_LENGTH) {
+        SMLOG_E("Error in endSHA224 \n");
+        *outLen = 0;
+        return 0;
+    }
+
+    status = Se05x_API_DigestFinal(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA224, NULL, 0, out, outLen);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestFinal \n");
+        *outLen = 0;
+        return 0;
+    }
+
+    status = Se05x_API_DeleteCryptoObject(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA224);
+
+    return 1;
+}
+
 int SE05XClass::beginSHA256()
 {
     smStatus_t      status;
@@ -950,6 +1067,118 @@ int SE05XClass::SHA256(const byte in[], size_t inLen, byte out[], size_t outMaxL
         *outLen = 0;
         return 0;
     }
+
+    return 1;
+}
+
+int SE05XClass::beginSHA384()
+{
+    smStatus_t      status;
+    SE05x_CryptoModeSubType_t subtype;
+
+    subtype.digest = kSE05x_DigestMode_SHA384;
+
+    status = Se05x_API_CreateCryptoObject(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA384, kSE05x_CryptoContext_DIGEST, subtype);
+    if (status != SM_OK) {
+        SMLOG_W("Se05x_API_CreateCryptoObject failed. Object already exists? \n");
+    }
+
+    status = Se05x_API_DigestInit(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA384);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestInit \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::updateSHA384(const byte in[], size_t inLen)
+{
+    smStatus_t      status;
+
+    status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA384, in, inLen);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestUpdate \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::endSHA384(byte out[], size_t* outLen)
+{
+    smStatus_t      status;
+
+    if (*outLen < SE05X_SHA384_LENGTH) {
+        SMLOG_E("Error in endSHA384 \n");
+        *outLen = 0;
+        return 0;
+    }
+
+    status = Se05x_API_DigestFinal(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA384, NULL, 0, out, outLen);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestFinal \n");
+        *outLen = 0;
+        return 0;
+    }
+
+    status = Se05x_API_DeleteCryptoObject(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA384);
+
+    return 1;
+}
+
+int SE05XClass::beginSHA512()
+{
+    smStatus_t      status;
+    SE05x_CryptoModeSubType_t subtype;
+
+    subtype.digest = kSE05x_DigestMode_SHA512;
+
+    status = Se05x_API_CreateCryptoObject(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA512, kSE05x_CryptoContext_DIGEST, subtype);
+    if (status != SM_OK) {
+        SMLOG_W("Se05x_API_CreateCryptoObject failed. Object already exists? \n");
+    }
+
+    status = Se05x_API_DigestInit(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA512);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestInit \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::updateSHA512(const byte in[], size_t inLen)
+{
+    smStatus_t      status;
+
+    status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA512, in, inLen);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestUpdate \n");
+        return 0;
+    }
+
+    return 1;
+}
+
+int SE05XClass::endSHA512(byte out[], size_t* outLen)
+{
+    smStatus_t      status;
+
+    if (*outLen < SE05X_SHA512_LENGTH) {
+        SMLOG_E("Error in endSHA512 \n");
+        *outLen = 0;
+        return 0;
+    }
+
+    status = Se05x_API_DigestFinal(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA512, NULL, 0, out, outLen);
+    if (status != SM_OK) {
+        SMLOG_E("Error in Se05x_API_DigestFinal \n");
+        *outLen = 0;
+        return 0;
+    }
+
+    status = Se05x_API_DeleteCryptoObject(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA512);
 
     return 1;
 }
@@ -1951,5 +2180,543 @@ int SE05XClass::pkcs1_v15_encode(uint8_t*                 hash,
 
     return 1;
 }
+
+int SE05XClass::I2OSP(uint8_t*  out,
+    uint64_t        xLen,
+    uint64_t        x)
+{
+    uint64_t cmp = (uint64_t)(1);
+    for (size_t i = 0; i < xLen; i++) {
+        cmp = cmp * 256ull;
+    }
+    if((uint64_t)x >= cmp){
+        return 0;
+    }
+    for (size_t i = 0; i < xLen; i++) {
+        out[i] = (uint8_t)((x & (0xFF << (xLen-1-i)*8)) >> (xLen-1-i)*8);
+    }
+    return 1;
+}
+
+/*
+ * Return:  1-Success, 0-Error
+
+ B.2.1.  MGF1
+
+   MGF1 is a mask generation function based on a hash function.
+
+   MGF1 (mgfSeed, maskLen)
+
+   Options:
+
+      Hash     hash function (hLen denotes the length in octets of
+               the hash function output)
+
+   Input:
+
+      mgfSeed  seed from which mask is generated, an octet string
+      maskLen  intended length in octets of the mask, at most 2^32 hLen
+
+   Output:
+
+      mask     mask, an octet string of length maskLen
+
+   Error: "mask too long"
+
+   Steps:
+
+   1.  If maskLen > 2^32 hLen, output "mask too long" and stop.
+
+   2.  Let T be the empty octet string.
+
+   3.  For counter from 0 to \ceil (maskLen / hLen) - 1, do the
+       following:
+
+       A.  Convert counter to an octet string C of length 4 octets (see
+           Section 4.1):
+
+              C = I2OSP (counter, 4) .
+
+       B.  Concatenate the hash of the seed mgfSeed and C to the octet
+           string T:
+
+              T = T || Hash(mgfSeed || C) .
+
+   4.  Output the leading maskLen octets of T as the octet string mask.
+
+   The object identifier id-mgf1 identifies the MGF1 mask generation
+   function:
+
+      id-mgf1    OBJECT IDENTIFIER ::= { pkcs-1 8 }
+      
+   The parameters field associated with this OID in a value of type
+   AlgorithmIdentifier shall have a value of type hashAlgorithm,
+   identifying the hash function on which MGF1 is based.
+
+ */
+int SE05XClass::mgf1(uint8_t*                 mgfSeed,
+                     size_t                   seedLen,
+                     uint8_t*                 mask,
+                     uint64_t*                maskLen,
+                     size_t                   hLen)
+{
+        //in this context its unrelistic that maskLen exceeds this
+        uint64_t comparison = (((uint64_t) hLen) * (1ull << 32));
+        if(*maskLen > comparison){
+            //If maskLen > 2^32 hLen, output "mask too long" and stop.
+            return 0;
+        }
+
+        // mask is supposed to be T (empty octet stream)
+        memset(mask, 0, (size_t) *maskLen);
+        size_t maskWritten = 0;
+
+        uint64_t ctrLim = 0;
+        if((*maskLen % hLen) == 0){
+            //no remainder 
+            ctrLim = (uint64_t)(*maskLen / hLen) - 1;
+        }else{
+            //remainder leave -1 out due to ceil
+            ctrLim = (uint64_t)(*maskLen / hLen);
+        }
+        
+        uint8_t c[4]= {0};
+        uint8_t data[seedLen + 4];
+        uint8_t out[hLen];
+        size_t outLen = hLen;
+        size_t ctr = 0;
+        int hashDataSent = 0;
+        int hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+        int hashCurrentChunkSize = 0;
+        size_t currentBytesToWrite = 0;
+
+
+        while (((uint64_t) maskWritten < *maskLen) && ((uint64_t) ctr <= ctrLim)){
+            switch (hLen)
+            {
+            case SE05X_SHA1_LENGTH:
+                if(beginSHA1() == 0){
+                    return 0;
+                }
+
+                I2OSP(c,4,ctr);
+                memcpy(data, mgfSeed, seedLen);
+                memcpy(data + seedLen, c, 4);
+
+                hashDataSent = 0;
+                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+
+                while (hashDataSent < (seedLen + 4)) {
+                    // Determine how much data to send in this iteration
+                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
+                    if (updateSHA1(&data[hashDataSent], hashCurrentChunkSize) == 0) {
+                        return 0; 
+                    }
+                    hashDataSent += hashCurrentChunkSize;
+                }
+
+                if(endSHA1(out, &outLen) == 0){
+                    return 0;
+                }
+                break;
+            case SE05X_SHA224_LENGTH:
+                if(beginSHA224() == 0){
+                    return 0;
+                }
+
+                I2OSP(c,4,ctr);
+                memcpy(data, mgfSeed, seedLen);
+                memcpy(data + seedLen, c, 4);
+
+                hashDataSent = 0;
+                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+
+                while (hashDataSent < (seedLen + 4)) {
+                    // Determine how much data to send in this iteration
+                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
+                    if (updateSHA224(&data[hashDataSent], hashCurrentChunkSize) == 0) {
+                        return 0; 
+                    }
+                    hashDataSent += hashCurrentChunkSize;
+                }
+
+                if(endSHA224(out, &outLen) == 0){
+                    return 0;
+                }
+                break;
+            case SE05X_SHA256_LENGTH:
+                if(beginSHA256() == 0){
+                    return 0;
+                }
+
+                I2OSP(c,4,ctr);
+                memcpy(data, mgfSeed, seedLen);
+                memcpy(data + seedLen, c, 4);
+
+                hashDataSent = 0;
+                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+
+                while (hashDataSent < (seedLen + 4)) {
+                    // Determine how much data to send in this iteration
+                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
+                    if (updateSHA256(&data[hashDataSent], hashCurrentChunkSize) == 0) {
+                        return 0; 
+                    }
+                    hashDataSent += hashCurrentChunkSize;
+                }
+
+                if(endSHA256(out, &outLen) == 0){
+                    return 0;
+                }
+                break;
+            case SE05X_SHA384_LENGTH:
+                if(beginSHA384() == 0){
+                    return 0;
+                }
+
+                I2OSP(c,4,ctr);
+                memcpy(data, mgfSeed, seedLen);
+                memcpy(data + seedLen, c, 4);
+
+                hashDataSent = 0;
+                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+
+                while (hashDataSent < (seedLen + 4)) {
+                    // Determine how much data to send in this iteration
+                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
+                    if (updateSHA384(&data[hashDataSent], hashCurrentChunkSize) == 0) {
+                        return 0; 
+                    }
+                    hashDataSent += hashCurrentChunkSize;
+                }
+
+                if(endSHA384(out, &outLen) == 0){
+                    return 0;
+                }
+                break;
+            case SE05X_SHA512_LENGTH:
+                if(beginSHA512() == 0){
+                    return 0;
+                }
+
+                I2OSP(c,4,ctr);
+                memcpy(data, mgfSeed, seedLen);
+                memcpy(data + seedLen, c, 4);
+
+                hashDataSent = 0;
+                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+
+                while (hashDataSent < (seedLen + 4)) {
+                    // Determine how much data to send in this iteration
+                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
+                    if (updateSHA512(&data[hashDataSent], hashCurrentChunkSize) == 0) {
+                        return 0; 
+                    }
+                    hashDataSent += hashCurrentChunkSize;
+                }
+
+                if(endSHA512(out, &outLen) == 0){
+                    return 0;
+                }
+                break;
+            default:
+                return 0;   // hLen must be of the output size of a accepted hashing algo (SHA1, SHA224,256,384,512)
+                break;
+            }
+
+            currentBytesToWrite = ((*maskLen - maskWritten) > outLen) ? outLen : (*maskLen - maskWritten);
+            memcpy(mask + maskWritten, out, currentBytesToWrite);
+            maskWritten += currentBytesToWrite;
+            ctr = ctr + 1;
+        }
+}
+
+/*
+ * Return:  1-Success, 0-Error
+ * to the RFC 8017 
+ */
+int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
+                                size_t                   hashlen,
+                                uint8_t*                 out,
+                                size_t*                  outLen,
+                                SE05x_RSASignatureAlgo_t rsaSignAlgo,
+                                SE05x_RSABitLength_t     keyLength)
+{
+    int emlen = (keyLength/8);
+    // RFC 8017 Steps 1 and 2 are to be made outside of this function (hashing of the message)
+    // emLen < hLen + sLen + 2, output "encoding error" and stop
+    /** RFC8017: RSASSA-PSS */
+    int saltLen = 0;
+    // Step 3.   If emLen < hLen + sLen + 2, output "encoding error" and stop.
+    // sLen = Salt length with default value of saltLength being the octet length of the hash value
+
+    switch (rsaSignAlgo)
+    {
+    case kSE05x_RSASignatureAlgo_SHA1_PKCS1_PSS:
+        /* code */
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA1_LENGTH * 2) + 2)))
+        {
+            return 0;
+        }
+        if(hashlen != SE05X_SHA1_LENGTH){
+            return 0;
+        }
+        saltLen = SE05X_SHA1_LENGTH;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA224_PKCS1_PSS:
+        /* code */
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA224_LENGTH * 2) + 2)))
+        {
+            return 0;
+        }
+        if(hashlen != SE05X_SHA224_LENGTH){
+            return 0;
+        }
+        saltLen = SE05X_SHA224_LENGTH;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA256_PKCS1_PSS:
+        /* code */
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA256_LENGTH * 2) + 2)))
+        {
+            return 0;
+        }
+        if(hashlen != SE05X_SHA256_LENGTH){
+            return 0;
+        }
+        saltLen = SE05X_SHA256_LENGTH;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA384_PKCS1_PSS:
+        /* code */
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA384_LENGTH * 2) + 2)))
+        {
+            return 0;
+        }
+        if(hashlen != SE05X_SHA384_LENGTH){
+            return 0;
+        }
+        saltLen = SE05X_SHA384_LENGTH;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA512_PKCS1_PSS:
+        /* code */
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA512_LENGTH * 2) + 2)))
+        {
+            return 0;
+        }
+        if(hashlen != SE05X_SHA512_LENGTH){
+            return 0;
+        }
+        saltLen = SE05X_SHA512_LENGTH;
+        break;
+    default:
+        return 0;  // unsupported signature algo
+        break;
+    }
+    // Step 4.   Generate a random octet string salt of length sLen; if sLen =
+    //           0, then salt is the empty string.
+    uint8_t salt[saltLen] = {0};
+    if (random(salt, saltLen) == 0)
+    {
+        return 0;
+    }
+
+    // step 5 M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt;
+    uint8_t m_[saltLen + hashlen + 8] = {0};
+    memset(m_, 0, 8);
+    memcpy(&m_[8], hash, hashlen);
+    memcpy(&m_[8 + hashlen], salt, saltLen);
+
+    // 6.   Let H = Hash(M'), an octet string of length hLen.
+    uint8_t h[hashlen] = {0};
+    int hashDataSent = 0;
+    int hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+    int hashCurrentChunkSize = 0;
+    switch (hashlen)
+        {
+        case SE05X_SHA1_LENGTH:
+            if(beginSHA1() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA1(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA1(h, &hashlen) == 0){
+                return 0;
+            }
+            if(hashlen != SE05X_SHA1_LENGTH){
+                return 0;
+            }
+            break;
+        case SE05X_SHA224_LENGTH:
+            if(beginSHA224() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA224(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA224(h, &hashlen) == 0){
+                return 0;
+            }
+            if(hashlen != SE05X_SHA224_LENGTH){
+                return 0;
+            }
+            break;
+        case SE05X_SHA256_LENGTH:
+            if(beginSHA256() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA256(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA256(h, &hashlen) == 0){
+                return 0;
+            }
+            if(hashlen != SE05X_SHA256_LENGTH){
+                return 0;
+            }
+            break;
+        case SE05X_SHA384_LENGTH:
+            if(beginSHA384() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA384(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA384(h, &hashlen) == 0){
+                return 0;
+            }
+            if(hashlen != SE05X_SHA384_LENGTH){
+                return 0;
+            }
+            break;
+        case SE05X_SHA512_LENGTH:
+            if(beginSHA512() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA512(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA512(h, &hashlen) == 0){
+                return 0;
+            }
+            if(hashlen != SE05X_SHA512_LENGTH){
+                return 0;
+            }
+            break;
+        default:
+            return 0;   // hashlen must be of the output size of a accepted hashing algo (SHA1, SHA224,256,384,512)
+            break;
+        }
+    
+    //7.   Generate an octet string PS consisting of emLen - sLen - hLen
+    //- 2 zero octets.  The length of PS may be 0.
+    uint8_t psOffest = emlen- saltLen - hashlen -2;
+
+    //8.   Let DB = PS || 0x01 || salt; DB is an octet string of length
+    //emLen - hLen - 1.
+    uint8_t db[emlen - hashlen - 1] = {0};
+    memset(db, 0, sizeof(db));
+    //9.   Let dbMask = MGF(H, emLen - hLen - 1).
+
+    
+
+}
+
+/*
+EMSA-PSS-ENCODE (M, emBits)
+
+Options:
+
+Hash     hash function (hLen denotes the length in octets of
+the hash function output)
+MGF      mask generation function
+sLen     intended length in octets of the salt
+
+Input:
+
+M        message to be encoded, an octet string
+emBits   maximal bit length of the integer OS2IP (EM) (see Section
+4.2), at least 8hLen + 8sLen + 9
+
+Output:
+
+EM       encoded message, an octet string of length emLen = \ceil
+(emBits/8)
+
+Errors:  "Encoding error"; "message too long"
+
+Steps:
+
+1.   If the length of M is greater than the input limitation for
+the hash function (2^61 - 1 octets for SHA-1), output
+"message too long" and stop.
+
+2.   Let mHash = Hash(M), an octet string of length hLen.
+
+3.   If emLen < hLen + sLen + 2, output "encoding error" and stop.
+
+4.   Generate a random octet string salt of length sLen; if sLen =
+0, then salt is the empty string.
+
+5.   Let
+
+M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt;
+
+M' is an octet string of length 8 + hLen + sLen with eight
+initial zero octets.
+
+6.   Let H = Hash(M'), an octet string of length hLen.
+
+7.   Generate an octet string PS consisting of emLen - sLen - hLen
+- 2 zero octets.  The length of PS may be 0.
+
+8.   Let DB = PS || 0x01 || salt; DB is an octet string of length
+emLen - hLen - 1.
+
+9.   Let dbMask = MGF(H, emLen - hLen - 1).
+
+10.  Let maskedDB = DB \xor dbMask.
+
+11.  Set the leftmost 8emLen - emBits bits of the leftmost octet
+in maskedDB to zero.
+
+12.  Let EM = maskedDB || H || 0xbc.
+
+13.  Output EM.
+*/
 
 SE05XClass SE05X;
