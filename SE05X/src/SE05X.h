@@ -708,6 +708,20 @@ public:
      * @return 0 on Failure 1 on Success
      */
     int RSADecryptRAW(int keyID, byte message[], size_t* messageLen, size_t messageMaxLen, const byte cipher[], size_t cipherLen);
+    int emsa_pss_encode(uint8_t*                 hash,
+        size_t                   hashlen,
+        uint8_t*                 out,
+        size_t*                  outLen,
+        SE05x_RSASignatureAlgo_t rsaSignAlgo,
+        SE05x_RSABitLength_t     keyLength,
+        uint8_t*                 externalSalt,
+        size_t                   externalSaltLen);
+    int emsa_pss_encode(uint8_t*                 hash,
+        size_t                   hashlen,
+        uint8_t*                 out,
+        size_t*                  outLen,
+        SE05x_RSASignatureAlgo_t rsaSignAlgo,
+        SE05x_RSABitLength_t     keyLength);
     /** mgf1
      *
      * Generates mgf1 mask

@@ -2024,7 +2024,7 @@ int SE05XClass::RSADecryptRAW(int keyID, byte message[], size_t* messageLen, siz
  * Return:  1-Success, 0-Error
  */
 int SE05XClass::pkcs1_v15_encode(uint8_t*                 hash,
-                                 size_t                   hashlen,
+                                 size_t                   hashLen,
                                  uint8_t*                 out,
                                  size_t*                  outLen,
                                  SE05x_RSASignatureAlgo_t rsaSignAlgo,
@@ -2088,7 +2088,7 @@ int SE05XClass::pkcs1_v15_encode(uint8_t*                 hash,
     default: return 0;
     }
 
-    if (outlength < (hashlen + oid_size + 6 /* DigestInfo TLV overhead */))
+    if (outlength < (hashLen + oid_size + 6 /* DigestInfo TLV overhead */))
     {
         return 0;
     }
@@ -2099,9 +2099,9 @@ int SE05XClass::pkcs1_v15_encode(uint8_t*                 hash,
     }
     *outLen = outlength;
 
-    /* Double-check that 8 + hashlen + oid_size can be used as a
+    /* Double-check that 8 + hashLen + oid_size can be used as a
      * 1-byte ASN.1 length encoding and that there's no overflow. */
-    if (8 + hashlen + oid_size >= 0x80)
+    if (8 + hashLen + oid_size >= 0x80)
     {
         return 0;
     }
@@ -2111,18 +2111,18 @@ int SE05XClass::pkcs1_v15_encode(uint8_t*                 hash,
      * - Need 10 bytes for five tag-length pairs.
      *   (Insist on 1-byte length encodings to protect against variants of
      *    Bleichenbacher's forgery attack against lax PKCS#1v1.5 verification)
-     * - Need hashlen bytes for hash
+     * - Need hashLen bytes for hash
      * - Need oid_size bytes for hash alg OID.
      */
-    if (hashlen > (SIZE_MAX - (10 + oid_size)))
+    if (hashLen > (SIZE_MAX - (10 + oid_size)))
     {
         return 0;
     }
-    if (nb_pad < 10 + hashlen + oid_size)
+    if (nb_pad < 10 + hashLen + oid_size)
     {
         return 0;
     }
-    nb_pad -= 10 + hashlen + oid_size;
+    nb_pad -= 10 + hashLen + oid_size;
 
     /* Need space for signature header and padding delimiter (3 bytes),
      * and 8 bytes for the minimal padding */
@@ -2156,7 +2156,7 @@ int SE05XClass::pkcs1_v15_encode(uint8_t*                 hash,
      *                 TAG-OCTET + LEN [ HASH ] ]
      */
     *p++ = ASN1_sequence | ASN1_constructed;
-    *p++ = (unsigned char) (0x08 + oid_size + hashlen);
+    *p++ = (unsigned char) (0x08 + oid_size + hashLen);
     *p++ = ASN1_sequence | ASN1_constructed;
     *p++ = (unsigned char) (0x04 + oid_size);
     *p++ = ASN1_oid;
@@ -2166,9 +2166,9 @@ int SE05XClass::pkcs1_v15_encode(uint8_t*                 hash,
     *p++ = ASN1_null;
     *p++ = 0x00;
     *p++ = ASN1_octat_string;
-    *p++ = (unsigned char) hashlen;
-    memcpy(p, hash, hashlen);
-    p += hashlen;
+    *p++ = (unsigned char) hashLen;
+    memcpy(p, hash, hashLen);
+    p += hashLen;
 
     /* Just a sanity-check, should be automatic
      * after the initial bounds check. */
@@ -2433,16 +2433,18 @@ int SE05XClass::mgf1(uint8_t*                 mgfSeed,
 
 /*
  * Return:  1-Success, 0-Error
- * to the RFC 8017 
+ * Made to the RFC 8017 
  */
 int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
-                                size_t                   hashlen,
+                                size_t                   hashLen,
                                 uint8_t*                 out,
                                 size_t*                  outLen,
                                 SE05x_RSASignatureAlgo_t rsaSignAlgo,
-                                SE05x_RSABitLength_t     keyLength)
+                                SE05x_RSABitLength_t     keyLength,
+                                uint8_t*                 externalSalt,
+                                size_t                   externalSaltLen)
 {
-    int emlen = (keyLength/8);
+    int emLen = (keyLength/8);
     // RFC 8017 Steps 1 and 2 are to be made outside of this function (hashing of the message)
     // emLen < hLen + sLen + 2, output "encoding error" and stop
     /** RFC8017: RSASSA-PSS */
@@ -2450,59 +2452,44 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
     // Step 3.   If emLen < hLen + sLen + 2, output "encoding error" and stop.
     // sLen = Salt length with default value of saltLength being the octet length of the hash value
 
+    //make sure the output buffer has the right size and set the saltLen according to the signAlgo
     switch (rsaSignAlgo)
     {
     case kSE05x_RSASignatureAlgo_SHA1_PKCS1_PSS:
-        /* code */
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA1_LENGTH * 2) + 2)))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA1_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA1_LENGTH))
         {
-            return 0;
-        }
-        if(hashlen != SE05X_SHA1_LENGTH){
             return 0;
         }
         saltLen = SE05X_SHA1_LENGTH;
         break;
     case kSE05x_RSASignatureAlgo_SHA224_PKCS1_PSS:
         /* code */
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA224_LENGTH * 2) + 2)))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA224_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA224_LENGTH))
         {
-            return 0;
-        }
-        if(hashlen != SE05X_SHA224_LENGTH){
             return 0;
         }
         saltLen = SE05X_SHA224_LENGTH;
         break;
     case kSE05x_RSASignatureAlgo_SHA256_PKCS1_PSS:
         /* code */
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA256_LENGTH * 2) + 2)))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA256_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA256_LENGTH))
         {
-            return 0;
-        }
-        if(hashlen != SE05X_SHA256_LENGTH){
             return 0;
         }
         saltLen = SE05X_SHA256_LENGTH;
         break;
     case kSE05x_RSASignatureAlgo_SHA384_PKCS1_PSS:
         /* code */
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA384_LENGTH * 2) + 2)))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA384_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA384_LENGTH))
         {
-            return 0;
-        }
-        if(hashlen != SE05X_SHA384_LENGTH){
             return 0;
         }
         saltLen = SE05X_SHA384_LENGTH;
         break;
     case kSE05x_RSASignatureAlgo_SHA512_PKCS1_PSS:
         /* code */
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA512_LENGTH * 2) + 2)))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA512_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA512_LENGTH))
         {
-            return 0;
-        }
-        if(hashlen != SE05X_SHA512_LENGTH){
             return 0;
         }
         saltLen = SE05X_SHA512_LENGTH;
@@ -2513,24 +2500,27 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
     }
     // Step 4.   Generate a random octet string salt of length sLen; if sLen =
     //           0, then salt is the empty string.
-    uint8_t salt[saltLen] = {0};
-    if (random(salt, saltLen) == 0)
-    {
+    
+    if(externalSalt == NULL || externalSaltLen != 0){
+        saltLen = externalSaltLen;
+    }else{
         return 0;
     }
+    uint8_t salt[saltLen] = {0};
+    memcpy(salt, externalSalt, externalSaltLen);
 
     // step 5 M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt;
-    uint8_t m_[saltLen + hashlen + 8] = {0};
+    uint8_t m_[saltLen + hashLen + 8] = {0};
     memset(m_, 0, 8);
-    memcpy(&m_[8], hash, hashlen);
-    memcpy(&m_[8 + hashlen], salt, saltLen);
+    memcpy(&m_[8], hash, hashLen);
+    memcpy(&m_[8 + hashLen], salt, saltLen);
 
     // 6.   Let H = Hash(M'), an octet string of length hLen.
-    uint8_t h[hashlen] = {0};
+    uint8_t h[hashLen] = {0};
     int hashDataSent = 0;
     int hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
     int hashCurrentChunkSize = 0;
-    switch (hashlen)
+    switch (hashLen)
         {
         case SE05X_SHA1_LENGTH:
             if(beginSHA1() == 0){
@@ -2546,10 +2536,10 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
                 }
                 hashDataSent += hashCurrentChunkSize;
             }
-            if(endSHA1(h, &hashlen) == 0){
+            if(endSHA1(h, &hashLen) == 0){
                 return 0;
             }
-            if(hashlen != SE05X_SHA1_LENGTH){
+            if(hashLen != SE05X_SHA1_LENGTH){
                 return 0;
             }
             break;
@@ -2567,10 +2557,10 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
                 }
                 hashDataSent += hashCurrentChunkSize;
             }
-            if(endSHA224(h, &hashlen) == 0){
+            if(endSHA224(h, &hashLen) == 0){
                 return 0;
             }
-            if(hashlen != SE05X_SHA224_LENGTH){
+            if(hashLen != SE05X_SHA224_LENGTH){
                 return 0;
             }
             break;
@@ -2588,10 +2578,10 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
                 }
                 hashDataSent += hashCurrentChunkSize;
             }
-            if(endSHA256(h, &hashlen) == 0){
+            if(endSHA256(h, &hashLen) == 0){
                 return 0;
             }
-            if(hashlen != SE05X_SHA256_LENGTH){
+            if(hashLen != SE05X_SHA256_LENGTH){
                 return 0;
             }
             break;
@@ -2609,10 +2599,10 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
                 }
                 hashDataSent += hashCurrentChunkSize;
             }
-            if(endSHA384(h, &hashlen) == 0){
+            if(endSHA384(h, &hashLen) == 0){
                 return 0;
             }
-            if(hashlen != SE05X_SHA384_LENGTH){
+            if(hashLen != SE05X_SHA384_LENGTH){
                 return 0;
             }
             break;
@@ -2630,32 +2620,292 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
                 }
                 hashDataSent += hashCurrentChunkSize;
             }
-            if(endSHA512(h, &hashlen) == 0){
+            if(endSHA512(h, &hashLen) == 0){
                 return 0;
             }
-            if(hashlen != SE05X_SHA512_LENGTH){
+            if(hashLen != SE05X_SHA512_LENGTH){
                 return 0;
             }
             break;
         default:
-            return 0;   // hashlen must be of the output size of a accepted hashing algo (SHA1, SHA224,256,384,512)
+            return 0;   // hashLen must be of the output size of a accepted hashing algo (SHA1, SHA224,256,384,512)
             break;
         }
     
     //7.   Generate an octet string PS consisting of emLen - sLen - hLen
     //- 2 zero octets.  The length of PS may be 0.
-    uint8_t psOffest = emlen- saltLen - hashlen -2;
+    uint8_t psOffest = emLen- saltLen - hashLen -2;
+    // we se db to zero and fill in the remaining data
 
     //8.   Let DB = PS || 0x01 || salt; DB is an octet string of length
     //emLen - hLen - 1.
-    uint8_t db[emlen - hashlen - 1] = {0};
-    memset(db, 0, sizeof(db));
+    uint8_t db[emLen - hashLen - 1] = {0};
+    memset(db, 0, emLen - hashLen - 1);
+    db[psOffest] = 0x01;
+    memcpy(&db[psOffest+1],salt, saltLen);
+
     //9.   Let dbMask = MGF(H, emLen - hLen - 1).
-
+    uint8_t dbMask[emLen - hashLen - 1] = {0};
+    uint64_t dbMaskLen = (emLen - hashLen - 1);
     
+    if(mgf1(h, hashLen, dbMask, &dbMaskLen, hashLen) == 0){
+        return 0;
+    }
+    //10.  Let maskedDB = DB \xor dbMask.
+    for(uint32_t i = 0; i < dbMaskLen; i++){
+        db[i] = db[i]^dbMask[i];
+    }
 
+    //11.  Set the leftmost 8emLen - emBits bits of the leftmost octet
+    //in maskedDB to zero.
+    uint32_t emBits = 8*emLen - 1;
+    // embits must at least be 8hLen + 8sLen + 9
+    if(emBits >= (8*hashLen + 8*saltLen + 9)){
+        db[0] &= 0xFF >> (emLen * 8 - emBits);
+    }
+    //12.  Let EM = maskedDB || H || 0xbc.
+    memcpy(out,db, emLen - hashLen - 1);
+    memcpy(&out[emLen - hashLen - 1],h, hashLen);
+    out[emLen - 1] = 0xbc;
+    //13.  Output EM.
+    *outLen = emLen;
+    return 1;
 }
+/*
+ * Return:  1-Success, 0-Error
+ * Made to the RFC 8017 
+ */
+int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
+                                size_t                   hashLen,
+                                uint8_t*                 out,
+                                size_t*                  outLen,
+                                SE05x_RSASignatureAlgo_t rsaSignAlgo,
+                                SE05x_RSABitLength_t     keyLength)
+{
+    int emLen = (keyLength/8);
+    // RFC 8017 Steps 1 and 2 are to be made outside of this function (hashing of the message)
+    // emLen < hLen + sLen + 2, output "encoding error" and stop
+    /** RFC8017: RSASSA-PSS */
+    int saltLen = 0;
+    // Step 3.   If emLen < hLen + sLen + 2, output "encoding error" and stop.
+    // sLen = Salt length with default value of saltLength being the octet length of the hash value
 
+    //make sure the output buffer has the right size and set the saltLen according to the signAlgo
+    switch (rsaSignAlgo)
+    {
+    case kSE05x_RSASignatureAlgo_SHA1_PKCS1_PSS:
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA1_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA1_LENGTH))
+        {
+            return 0;
+        }
+        saltLen = SE05X_SHA1_LENGTH;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA224_PKCS1_PSS:
+        /* code */
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA224_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA224_LENGTH))
+        {
+            return 0;
+        }
+        saltLen = SE05X_SHA224_LENGTH;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA256_PKCS1_PSS:
+        /* code */
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA256_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA256_LENGTH))
+        {
+            return 0;
+        }
+        saltLen = SE05X_SHA256_LENGTH;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA384_PKCS1_PSS:
+        /* code */
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA384_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA384_LENGTH))
+        {
+            return 0;
+        }
+        saltLen = SE05X_SHA384_LENGTH;
+        break;
+    case kSE05x_RSASignatureAlgo_SHA512_PKCS1_PSS:
+        /* code */
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA512_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA512_LENGTH))
+        {
+            return 0;
+        }
+        saltLen = SE05X_SHA512_LENGTH;
+        break;
+    default:
+        return 0;  // unsupported signature algo
+        break;
+    }
+    // Step 4.   Generate a random octet string salt of length sLen; if sLen =
+    //           0, then salt is the empty string.
+    uint8_t salt[saltLen] = {0};
+    if (random(salt, saltLen) == 0)
+    {
+        return 0;
+    }
+
+    // step 5 M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt;
+    uint8_t m_[saltLen + hashLen + 8] = {0};
+    memset(m_, 0, 8);
+    memcpy(&m_[8], hash, hashLen);
+    memcpy(&m_[8 + hashLen], salt, saltLen);
+
+    // 6.   Let H = Hash(M'), an octet string of length hLen.
+    uint8_t h[hashLen] = {0};
+    int hashDataSent = 0;
+    int hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+    int hashCurrentChunkSize = 0;
+    switch (hashLen)
+        {
+        case SE05X_SHA1_LENGTH:
+            if(beginSHA1() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA1(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA1(h, &hashLen) == 0){
+                return 0;
+            }
+            if(hashLen != SE05X_SHA1_LENGTH){
+                return 0;
+            }
+            break;
+        case SE05X_SHA224_LENGTH:
+            if(beginSHA224() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA224(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA224(h, &hashLen) == 0){
+                return 0;
+            }
+            if(hashLen != SE05X_SHA224_LENGTH){
+                return 0;
+            }
+            break;
+        case SE05X_SHA256_LENGTH:
+            if(beginSHA256() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA256(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA256(h, &hashLen) == 0){
+                return 0;
+            }
+            if(hashLen != SE05X_SHA256_LENGTH){
+                return 0;
+            }
+            break;
+        case SE05X_SHA384_LENGTH:
+            if(beginSHA384() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA384(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA384(h, &hashLen) == 0){
+                return 0;
+            }
+            if(hashLen != SE05X_SHA384_LENGTH){
+                return 0;
+            }
+            break;
+        case SE05X_SHA512_LENGTH:
+            if(beginSHA512() == 0){
+                return 0;
+            }
+            hashDataSent = 0;
+            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
+            while (hashDataSent < (sizeof(m_))) {
+                // Determine how much data to send in this iteration
+                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
+                if (updateSHA512(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
+                    return 0; 
+                }
+                hashDataSent += hashCurrentChunkSize;
+            }
+            if(endSHA512(h, &hashLen) == 0){
+                return 0;
+            }
+            if(hashLen != SE05X_SHA512_LENGTH){
+                return 0;
+            }
+            break;
+        default:
+            return 0;   // hashLen must be of the output size of a accepted hashing algo (SHA1, SHA224,256,384,512)
+            break;
+        }
+    
+    //7.   Generate an octet string PS consisting of emLen - sLen - hLen
+    //- 2 zero octets.  The length of PS may be 0.
+    uint8_t psOffest = emLen- saltLen - hashLen -2;
+    // we se db to zero and fill in the remaining data
+
+    //8.   Let DB = PS || 0x01 || salt; DB is an octet string of length
+    //emLen - hLen - 1.
+    uint8_t db[emLen - hashLen - 1] = {0};
+    memset(db, 0, emLen - hashLen - 1);
+    db[psOffest] = 0x01;
+    memcpy(&db[psOffest+1],salt, saltLen);
+
+    //9.   Let dbMask = MGF(H, emLen - hLen - 1).
+    uint8_t dbMask[emLen - hashLen - 1] = {0};
+    uint64_t dbMaskLen = (emLen - hashLen - 1);
+    
+    if(mgf1(h, hashLen, dbMask, &dbMaskLen, hashLen) == 0){
+        return 0;
+    }
+    //10.  Let maskedDB = DB \xor dbMask.
+    for(uint32_t i = 0; i < dbMaskLen; i++){
+        db[i] = db[i]^dbMask[i];
+    }
+
+    //11.  Set the leftmost 8emLen - emBits bits of the leftmost octet
+    //in maskedDB to zero.
+    uint32_t emBits = 8*emLen - 1;
+    // embits must at least be 8hLen + 8sLen + 9
+    if(emBits >= (8*hashLen + 8*saltLen + 9)){
+        db[0] &= 0xFF >> (emLen * 8 - emBits);
+    }
+    //12.  Let EM = maskedDB || H || 0xbc.
+    memcpy(out,db, emLen - hashLen - 1);
+    memcpy(&out[emLen - hashLen - 1],h, hashLen);
+    out[emLen - 1] = 0xbc;
+    //13.  Output EM.
+    *outLen = emLen;
+    return 1;
+}
 /*
 EMSA-PSS-ENCODE (M, emBits)
 
@@ -2718,5 +2968,54 @@ in maskedDB to zero.
 
 13.  Output EM.
 */
+
+
+
+// EMSA-PSS-VERIFY (M, EM, emBits)
+
+//    Options:
+
+//       Hash     hash function (hLen denotes the length in octets of
+//                the hash function output)
+//       MGF      mask generation function
+//       sLen     intended length in octets of the salt
+
+//    Input:
+
+//       M        message to be verified, an octet string
+//       EM       encoded message, an octet string of length emLen = \ceil
+//                (emBits/8)
+//       emBits   maximal bit length of the integer OS2IP (EM) (see Section
+//                4.2), at least 8hLen + 8sLen + 9
+
+//    Output:  "consistent" or "inconsistent"
+
+//    Steps:
+
+//       1.   If the length of M is greater than the input limitation for
+//            the hash function (2^61 - 1 octets for SHA-1), output
+//            "inconsistent" and stop.
+
+//       2.   Let mHash = Hash(M), an octet string of length hLen.
+
+//       3.   If emLen < hLen + sLen + 2, output "inconsistent" and stop.
+
+//       4.   If the rightmost octet of EM does not have hexadecimal value
+//            0xbc, output "inconsistent" and stop.
+
+//       5.   Let maskedDB be the leftmost emLen - hLen - 1 octets of EM,
+//            and let H be the next hLen octets.
+
+//       6.   If the leftmost 8emLen - emBits bits of the leftmost octet in
+//            maskedDB are not all equal to zero, output "inconsistent" and
+//            stop.
+
+//       7.   Let dbMask = MGF(H, emLen - hLen - 1).
+
+//       8.   Let DB = maskedDB \xor dbMask.
+
+//       9.   Set the leftmost 8emLen - emBits bits of the leftmost octet
+//            in DB to zero.
+
 
 SE05XClass SE05X;
