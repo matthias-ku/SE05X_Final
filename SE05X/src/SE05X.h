@@ -398,7 +398,7 @@ public:
      */
     int Verify(int keyID, const byte hash[], size_t hashLen, const byte sig[],size_t sigLen);
 
-    /** Verify
+    /** VerifyRSASSA_PKCS1
      *
      * Verify RSASSA_PKCS1 signature using key stored in KeyID SE050 object.
      *
@@ -641,12 +641,15 @@ public:
 
     /** pkcs1_v15_encode
      *
-     * The hash to the buffer in the RSASSA-PKCS1-v1_5 format.
+     * Encodes the hash into the buffer in the RSASSA-PKCS1-v1_5 format.
      *
-     * @param[in] ObjectId SE050 object ID
-     * @param[in] data Input data buffer
-     * @param[in] length Number of bytes to write
-     *
+     * @param[in] hash hash to be encoded
+     * @param[in] hashlen length of the input hash
+     * @param[out] out output buffer for the encoded data
+     * @param[in/out] outLen IN: output buffer length OUT: value gets overwritten with the length of the encoded data
+     * @param[in] rsaSignAlgo Type of signature (only PKCS1-v1_5)
+     * @param[in] keyLength length of the rsa key to be used
+     * 
      * @return 0 on Failure 1 on Success
      */
     int pkcs1_v15_encode(uint8_t* hash, size_t hashlen, uint8_t* out, size_t* outLen, SE05x_RSASignatureAlgo_t rsaSignAlgo, SE05x_RSABitLength_t keyLength);
@@ -708,20 +711,51 @@ public:
      * @return 0 on Failure 1 on Success
      */
     int RSADecryptRAW(int keyID, byte message[], size_t* messageLen, size_t messageMaxLen, const byte cipher[], size_t cipherLen);
-    int emsa_pss_encode(uint8_t*                 hash,
-        size_t                   hashlen,
-        uint8_t*                 out,
-        size_t*                  outLen,
-        SE05x_RSASignatureAlgo_t rsaSignAlgo,
-        SE05x_RSABitLength_t     keyLength,
-        uint8_t*                 externalSalt,
-        size_t                   externalSaltLen);
-    int emsa_pss_encode(uint8_t*                 hash,
-        size_t                   hashlen,
-        uint8_t*                 out,
-        size_t*                  outLen,
-        SE05x_RSASignatureAlgo_t rsaSignAlgo,
-        SE05x_RSABitLength_t     keyLength);
+    /** emsa_pss_encode
+     *
+     * Encodes the hash into the buffer in the EMSA-PSS format using an externally provided Salt.
+     *
+     * @param[in] hash hash to be encoded
+     * @param[in] hashlen length of the input hash
+     * @param[out] out output buffer for the encoded data
+     * @param[in/out] outLen IN: output buffer length OUT: value gets overwritten with the length of the encoded data
+     * @param[in] rsaSignAlgo Type of signature (only RSASA-PSS)
+     * @param[in] keyLength length of the rsa key to be used
+     * @param[in] externalSalt buffer to the external salt buffer (must be at least 1 byte long, if it is a empty salt (sLen=0) the value shall be 0x00)
+     * @param[in] externalSaltLen buffer length of the external salt buffer must be at least 1 or larger
+     * 
+     * @return 0 on Failure 1 on Success
+     */
+    int emsa_pss_encode(uint8_t* hash, size_t hashlen, uint8_t* out, size_t* outLen, SE05x_RSASignatureAlgo_t rsaSignAlgo, SE05x_RSABitLength_t keyLength, uint8_t* externalSalt, size_t externalSaltLen);
+
+    /** emsa_pss_encode
+     *
+     * Encodes the hash into the buffer in the EMSA-PSS format using a random Salt.
+     *
+     * @param[in] hash hash to be encoded
+     * @param[in] hashlen length of the input hash
+     * @param[out] out output buffer for the encoded data
+     * @param[in/out] outLen IN: output buffer length OUT: value gets overwritten with the length of the encoded data
+     * @param[in] rsaSignAlgo Type of signature (only RSASA-PSS)
+     * @param[in] keyLength length of the rsa key to be used
+     * 
+     * @return 0 on Failure 1 on Success
+     */
+    int emsa_pss_encode(uint8_t* hash, size_t hashlen, uint8_t* out, size_t* outLen, SE05x_RSASignatureAlgo_t rsaSignAlgo, SE05x_RSABitLength_t keyLength);
+    /** VerifyRSASSA_PSS
+     *
+     * Verify RSASSA_PSS signature using key stored in KeyID SE050 object.
+     *
+     *
+     * @param[in] keyID SE050 object ID containing the key
+     * @param[in] hash hash to verify
+     * @param[in] hashLen hash length
+     * @param[in] sig Input buffer containint the signature
+     * @param[in] sigLen signature length
+     *
+     * @return 0 on Failure (Not match) 1 on Success (Match)
+     */
+    int VerifyRSASSA_PSS(int keyID, byte hash[], size_t hashLen, const byte sig[], size_t sigLen);
     /** mgf1
      *
      * Generates mgf1 mask
