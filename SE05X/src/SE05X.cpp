@@ -2633,7 +2633,7 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
     
     //7.   Generate an octet string PS consisting of emLen - sLen - hLen
     //- 2 zero octets.  The length of PS may be 0.
-    uint8_t psOffest = emLen- saltLen - hashLen -2;
+    uint32_t psOffest = emLen- saltLen - hashLen -2;
     // we se db to zero and fill in the remaining data
 
     //8.   Let DB = PS || 0x01 || salt; DB is an octet string of length
