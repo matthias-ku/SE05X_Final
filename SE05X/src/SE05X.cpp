@@ -912,11 +912,20 @@ int SE05XClass::beginSHA1()
 int SE05XClass::updateSHA1(const byte in[], size_t inLen)
 {
     smStatus_t      status;
+    size_t          offset = 0;
+    size_t          left = inLen;
+    size_t          chunk = 0;
 
-    status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA, in, inLen);
-    if (status != SM_OK) {
-        SMLOG_E("Error in Se05x_API_DigestUpdate \n");
-        return 0;
+    while (left > 0) {
+        chunk = (left > SE05X_MAX_CHUNK_SIZE) ? SE05X_MAX_CHUNK_SIZE : left;
+        left           = left - chunk;
+
+        status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA, (in + offset), chunk);
+        if (status != SM_OK) {
+            SMLOG_E("Error in Se05x_API_DigestUpdate \n");
+            return 0;
+        }
+        offset = offset + chunk;
     }
 
     return 1;
@@ -968,11 +977,20 @@ int SE05XClass::beginSHA224()
 int SE05XClass::updateSHA224(const byte in[], size_t inLen)
 {
     smStatus_t      status;
+    size_t          offset = 0;
+    size_t          left = inLen;
+    size_t          chunk = 0;
 
-    status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA224, in, inLen);
-    if (status != SM_OK) {
-        SMLOG_E("Error in Se05x_API_DigestUpdate \n");
-        return 0;
+    while (left > 0) {
+        chunk = (left > SE05X_MAX_CHUNK_SIZE) ? SE05X_MAX_CHUNK_SIZE : left;
+        left           = left - chunk;
+
+        status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA224, (in + offset), chunk);
+        if (status != SM_OK) {
+            SMLOG_E("Error in Se05x_API_DigestUpdate \n");
+            return 0;
+        }
+        offset = offset + chunk;
     }
 
     return 1;
@@ -1024,11 +1042,20 @@ int SE05XClass::beginSHA256()
 int SE05XClass::updateSHA256(const byte in[], size_t inLen)
 {
     smStatus_t      status;
+    size_t          offset = 0;
+    size_t          left = inLen;
+    size_t          chunk = 0;
 
-    status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA256, in, inLen);
-    if (status != SM_OK) {
-        SMLOG_E("Error in Se05x_API_DigestUpdate \n");
-        return 0;
+    while (left > 0) {
+        chunk = (left > SE05X_MAX_CHUNK_SIZE) ? SE05X_MAX_CHUNK_SIZE : left;
+        left           = left - chunk;
+
+        status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA256, (in + offset), chunk);
+        if (status != SM_OK) {
+            SMLOG_E("Error in Se05x_API_DigestUpdate \n");
+            return 0;
+        }
+        offset = offset + chunk;
     }
 
     return 1;
@@ -1095,11 +1122,20 @@ int SE05XClass::beginSHA384()
 int SE05XClass::updateSHA384(const byte in[], size_t inLen)
 {
     smStatus_t      status;
+    size_t          offset = 0;
+    size_t          left = inLen;
+    size_t          chunk = 0;
 
-    status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA384, in, inLen);
-    if (status != SM_OK) {
-        SMLOG_E("Error in Se05x_API_DigestUpdate \n");
-        return 0;
+    while (left > 0) {
+        chunk = (left > SE05X_MAX_CHUNK_SIZE) ? SE05X_MAX_CHUNK_SIZE : left;
+        left           = left - chunk;
+
+        status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA384, (in + offset), chunk);
+        if (status != SM_OK) {
+            SMLOG_E("Error in Se05x_API_DigestUpdate \n");
+            return 0;
+        }
+        offset = offset + chunk;
     }
 
     return 1;
@@ -1151,11 +1187,20 @@ int SE05XClass::beginSHA512()
 int SE05XClass::updateSHA512(const byte in[], size_t inLen)
 {
     smStatus_t      status;
+    size_t          offset = 0;
+    size_t          left = inLen;
+    size_t          chunk = 0;
 
-    status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA512, in, inLen);
-    if (status != SM_OK) {
-        SMLOG_E("Error in Se05x_API_DigestUpdate \n");
-        return 0;
+    while (left > 0) {
+        chunk = (left > SE05X_MAX_CHUNK_SIZE) ? SE05X_MAX_CHUNK_SIZE : left;
+        left           = left - chunk;
+
+        status = Se05x_API_DigestUpdate(&_se05x_session, kSE05x_CryptoObject_DIGEST_SHA512, (in + offset), chunk);
+        if (status != SM_OK) {
+            SMLOG_E("Error in Se05x_API_DigestUpdate \n");
+            return 0;
+        }
+        offset = offset + chunk;
     }
 
     return 1;
@@ -2285,9 +2330,7 @@ int SE05XClass::mgf1(uint8_t*                 mgfSeed,
         uint8_t out[hLen];
         size_t outLen = hLen;
         size_t ctr = 0;
-        int hashDataSent = 0;
-        int hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-        int hashCurrentChunkSize = 0;
+        
         size_t currentBytesToWrite = 0;
 
 
@@ -2303,16 +2346,8 @@ int SE05XClass::mgf1(uint8_t*                 mgfSeed,
                 memcpy(data, mgfSeed, seedLen);
                 memcpy(data + seedLen, c, 4);
 
-                hashDataSent = 0;
-                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-
-                while (hashDataSent < (seedLen + 4)) {
-                    // Determine how much data to send in this iteration
-                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
-                    if (updateSHA1(&data[hashDataSent], hashCurrentChunkSize) == 0) {   // deep recursion issue?
-                        return 0; 
-                    }
-                    hashDataSent += hashCurrentChunkSize;
+                if(updateSHA1(data, (seedLen + 4)) == 0){
+                    return 0; 
                 }
 
                 if(endSHA1(out, &outLen) == 0){
@@ -2328,16 +2363,8 @@ int SE05XClass::mgf1(uint8_t*                 mgfSeed,
                 memcpy(data, mgfSeed, seedLen);
                 memcpy(data + seedLen, c, 4);
 
-                hashDataSent = 0;
-                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-
-                while (hashDataSent < (seedLen + 4)) {
-                    // Determine how much data to send in this iteration
-                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
-                    if (updateSHA224(&data[hashDataSent], hashCurrentChunkSize) == 0) {
-                        return 0; 
-                    }
-                    hashDataSent += hashCurrentChunkSize;
+                if(updateSHA224(data, (seedLen + 4)) == 0){
+                    return 0; 
                 }
 
                 if(endSHA224(out, &outLen) == 0){
@@ -2353,16 +2380,8 @@ int SE05XClass::mgf1(uint8_t*                 mgfSeed,
                 memcpy(data, mgfSeed, seedLen);
                 memcpy(data + seedLen, c, 4);
 
-                hashDataSent = 0;
-                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-
-                while (hashDataSent < (seedLen + 4)) {
-                    // Determine how much data to send in this iteration
-                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
-                    if (updateSHA256(&data[hashDataSent], hashCurrentChunkSize) == 0) {
-                        return 0; 
-                    }
-                    hashDataSent += hashCurrentChunkSize;
+                if(updateSHA256(data, (seedLen + 4)) == 0){
+                    return 0; 
                 }
 
                 if(endSHA256(out, &outLen) == 0){
@@ -2378,16 +2397,8 @@ int SE05XClass::mgf1(uint8_t*                 mgfSeed,
                 memcpy(data, mgfSeed, seedLen);
                 memcpy(data + seedLen, c, 4);
 
-                hashDataSent = 0;
-                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-
-                while (hashDataSent < (seedLen + 4)) {
-                    // Determine how much data to send in this iteration
-                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
-                    if (updateSHA384(&data[hashDataSent], hashCurrentChunkSize) == 0) {
-                        return 0; 
-                    }
-                    hashDataSent += hashCurrentChunkSize;
+                if(updateSHA384(data, (seedLen + 4)) == 0){
+                    return 0; 
                 }
 
                 if(endSHA384(out, &outLen) == 0){
@@ -2403,16 +2414,8 @@ int SE05XClass::mgf1(uint8_t*                 mgfSeed,
                 memcpy(data, mgfSeed, seedLen);
                 memcpy(data + seedLen, c, 4);
 
-                hashDataSent = 0;
-                hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-
-                while (hashDataSent < (seedLen + 4)) {
-                    // Determine how much data to send in this iteration
-                    hashCurrentChunkSize = (((seedLen + 4) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((seedLen + 4) - hashDataSent);
-                    if (updateSHA512(&data[hashDataSent], hashCurrentChunkSize) == 0) {
-                        return 0; 
-                    }
-                    hashDataSent += hashCurrentChunkSize;
+                if(updateSHA512(data, (seedLen + 4)) == 0){
+                    return 0; 
                 }
 
                 if(endSHA512(out, &outLen) == 0){
@@ -2517,23 +2520,13 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
 
     // 6.   Let H = Hash(M'), an octet string of length hLen.
     uint8_t h[hashLen] = {0};
-    int hashDataSent = 0;
-    int hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-    int hashCurrentChunkSize = 0;
     switch (hashLen){
         case SE05X_SHA1_LENGTH:
             if(beginSHA1() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA1(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA1(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA1(h, &hashLen) == 0){
                 return 0;
@@ -2546,15 +2539,8 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
             if(beginSHA224() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA224(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA224(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA224(h, &hashLen) == 0){
                 return 0;
@@ -2567,15 +2553,8 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
             if(beginSHA256() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA256(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA256(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA256(h, &hashLen) == 0){
                 return 0;
@@ -2588,15 +2567,8 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
             if(beginSHA384() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA384(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA384(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA384(h, &hashLen) == 0){
                 return 0;
@@ -2609,15 +2581,8 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
             if(beginSHA512() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA512(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA512(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA512(h, &hashLen) == 0){
                 return 0;
@@ -2751,24 +2716,13 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
 
     // 6.   Let H = Hash(M'), an octet string of length hLen.
     uint8_t h[hashLen] = {0};
-    int hashDataSent = 0;
-    int hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-    int hashCurrentChunkSize = 0;
-    switch (hashLen)
-        {
+    switch (hashLen){
         case SE05X_SHA1_LENGTH:
             if(beginSHA1() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA1(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA1(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA1(h, &hashLen) == 0){
                 return 0;
@@ -2781,15 +2735,8 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
             if(beginSHA224() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA224(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA224(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA224(h, &hashLen) == 0){
                 return 0;
@@ -2802,15 +2749,8 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
             if(beginSHA256() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA256(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA256(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA256(h, &hashLen) == 0){
                 return 0;
@@ -2823,15 +2763,8 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
             if(beginSHA384() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA384(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA384(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA384(h, &hashLen) == 0){
                 return 0;
@@ -2844,15 +2777,8 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
             if(beginSHA512() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(m_))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(m_) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(m_)) - hashDataSent);
-                if (updateSHA512(&m_[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA512(m_, sizeof(m_)) == 0){
+                return 0; 
             }
             if(endSHA512(h, &hashLen) == 0){
                 return 0;
@@ -2864,7 +2790,7 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
         default:
             return 0;   // hashLen must be of the output size of a accepted hashing algo (SHA1, SHA224,256,384,512)
             break;
-        }
+    }
     
     //7.   Generate an octet string PS consisting of emLen - sLen - hLen
     //- 2 zero octets.  The length of PS may be 0.
@@ -3017,25 +2943,14 @@ int SE05XClass::VerifyRSASSA_PSS(int keyID, byte hash[], size_t hashLen, const b
         static uint8_t h_[SE05X_SHA512_LENGTH] = {0};
         size_t h_Len = SE05X_SHA512_LENGTH;
 
-        int hashDataSent = 0;
-        int hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-        int hashCurrentChunkSize = 0;
-
         switch (hashLen)
         {
         case SE05X_SHA1_LENGTH:
             if(beginSHA1() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(mDash))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(mDash) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(mDash)) - hashDataSent);
-                if (updateSHA1(&mDash[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA1(mDash, sizeof(mDash)) == 0){
+                return 0; 
             }
             if(endSHA1(h_, &h_Len) == 0){
                 return 0;
@@ -3048,15 +2963,8 @@ int SE05XClass::VerifyRSASSA_PSS(int keyID, byte hash[], size_t hashLen, const b
             if(beginSHA224() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(mDash))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(mDash) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(mDash)) - hashDataSent);
-                if (updateSHA224(&mDash[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA224(mDash, sizeof(mDash)) == 0){
+                return 0; 
             }
             if(endSHA224(h_, &h_Len) == 0){
                 return 0;
@@ -3069,15 +2977,8 @@ int SE05XClass::VerifyRSASSA_PSS(int keyID, byte hash[], size_t hashLen, const b
             if(beginSHA256() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(mDash))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(mDash) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(mDash)) - hashDataSent);
-                if (updateSHA256(&mDash[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA256(mDash, sizeof(mDash)) == 0){
+                return 0; 
             }
             if(endSHA256(h_, &h_Len) == 0){
                 return 0;
@@ -3090,15 +2991,8 @@ int SE05XClass::VerifyRSASSA_PSS(int keyID, byte hash[], size_t hashLen, const b
             if(beginSHA384() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(mDash))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(mDash) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(mDash)) - hashDataSent);
-                if (updateSHA384(&mDash[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA384(mDash, sizeof(mDash)) == 0){
+                return 0; 
             }
             if(endSHA384(h_, &h_Len) == 0){
                 return 0;
@@ -3111,15 +3005,8 @@ int SE05XClass::VerifyRSASSA_PSS(int keyID, byte hash[], size_t hashLen, const b
             if(beginSHA512() == 0){
                 return 0;
             }
-            hashDataSent = 0;
-            hashChunkSize = SE05X_MAX_CHUNK_SIZE; 
-            while (hashDataSent < (sizeof(mDash))) {
-                // Determine how much data to send in this iteration
-                hashCurrentChunkSize = ((sizeof(mDash) - hashDataSent) > hashChunkSize) ? hashChunkSize : ((sizeof(mDash)) - hashDataSent);
-                if (updateSHA512(&mDash[hashDataSent], hashCurrentChunkSize) == 0) {
-                    return 0; 
-                }
-                hashDataSent += hashCurrentChunkSize;
+            if(updateSHA512(mDash, sizeof(mDash)) == 0){
+                return 0; 
             }
             if(endSHA512(h_, &h_Len) == 0){
                 return 0;
