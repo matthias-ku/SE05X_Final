@@ -2459,7 +2459,7 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
     switch (rsaSignAlgo)
     {
     case kSE05x_RSASignatureAlgo_SHA1_PKCS1_PSS:
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA1_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA1_LENGTH))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA1_LENGTH + externalSaltLen) + 2)) || (hashLen != SE05X_SHA1_LENGTH))
         {
             return 0;
         }
@@ -2467,7 +2467,7 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
         break;
     case kSE05x_RSASignatureAlgo_SHA224_PKCS1_PSS:
         /* code */
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA224_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA224_LENGTH))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA224_LENGTH + externalSaltLen) + 2)) || (hashLen != SE05X_SHA224_LENGTH))
         {
             return 0;
         }
@@ -2475,7 +2475,7 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
         break;
     case kSE05x_RSASignatureAlgo_SHA256_PKCS1_PSS:
         /* code */
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA256_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA256_LENGTH))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA256_LENGTH + externalSaltLen) + 2)) || (hashLen != SE05X_SHA256_LENGTH))
         {
             return 0;
         }
@@ -2483,7 +2483,7 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
         break;
     case kSE05x_RSASignatureAlgo_SHA384_PKCS1_PSS:
         /* code */
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA384_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA384_LENGTH))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA384_LENGTH + externalSaltLen) + 2)) || (hashLen != SE05X_SHA384_LENGTH))
         {
             return 0;
         }
@@ -2491,7 +2491,7 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
         break;
     case kSE05x_RSASignatureAlgo_SHA512_PKCS1_PSS:
         /* code */
-        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA512_LENGTH * 2) + 2)) || (hashLen != SE05X_SHA512_LENGTH))
+        if ((*outLen < (keyLength/8)) || (*outLen < ((SE05X_SHA512_LENGTH + externalSaltLen) + 2)) || (hashLen != SE05X_SHA512_LENGTH))
         {
             return 0;
         }
@@ -2868,8 +2868,9 @@ int SE05XClass::VerifyRSASSA_PSS(int keyID, byte hash[], size_t hashLen, const b
         return 0;
     }
 
+    // the salt may be empty, in this case the salt would be 0x00 thus we add + 1 in the length check
     if ((sigLen < SE05X_MIN_SIGNATURE_LENGTH) || (sigLen > SE05X_MAX_SIGNATURE_LENGTH) || (sigLen != key_size) || 
-    (sigLen < (2 * hashLen + 2)))
+    (sigLen < (hashLen + 1 + 2)))
     {
         SMLOG_E("Error in VerifyRSASSA_PSS: invalid signature length\n");
         return 0;
