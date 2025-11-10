@@ -2503,20 +2503,21 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
     }
     // Step 4.   Generate a random octet string salt of length sLen; if sLen =
     //           0, then salt is the empty string.
-    // this means the minimum size is one byte, with salt being 0x00 (empty string)
-    if(externalSalt != NULL && externalSaltLen != 0){
-        saltLen = externalSaltLen;
-    }else{
-        return 0;
-    }
-    uint8_t salt[saltLen] = {0};
-    memcpy(salt, externalSalt, externalSaltLen);
+    saltLen = externalSaltLen;
 
     // step 5 M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt;
     uint8_t m_[saltLen + hashLen + 8] = {0};
     memset(m_, 0, 8);
     memcpy(&m_[8], hash, hashLen);
-    memcpy(&m_[8 + hashLen], salt, saltLen);
+
+    if (externalSalt != NULL && externalSaltLen != 0) {
+        memcpy(&m_[8 + hashLen], externalSalt, saltLen);
+    } else if (externalSalt == NULL && externalSaltLen == 0) {
+        // do nothing since slen = 0
+    } else {
+        // Invalid input
+        return 0;
+    }
 
     // 6.   Let H = Hash(M'), an octet string of length hLen.
     uint8_t h[hashLen] = {0};
@@ -2606,7 +2607,10 @@ int SE05XClass::emsa_pss_encode(uint8_t*                 hash,
     uint8_t db[emLen - hashLen - 1] = {0};
     memset(db, 0, emLen - hashLen - 1);
     db[psOffest] = 0x01;
-    memcpy(&db[psOffest+1],salt, saltLen);
+    if(saltLen != 0){
+        memcpy(&db[psOffest+1], externalSalt, saltLen);
+    }
+    
 
     //9.   Let dbMask = MGF(H, emLen - hLen - 1).
     uint8_t dbMask[emLen - hashLen - 1] = {0};
@@ -2868,9 +2872,9 @@ int SE05XClass::VerifyRSASSA_PSS(int keyID, byte hash[], size_t hashLen, const b
         return 0;
     }
 
-    // the salt may be empty, in this case the salt would be 0x00 thus we add + 1 in the length check
+    // the salt may be empty
     if ((sigLen < SE05X_MIN_SIGNATURE_LENGTH) || (sigLen > SE05X_MAX_SIGNATURE_LENGTH) || (sigLen != key_size) || 
-    (sigLen < (hashLen + 1 + 2)))
+    (sigLen < (hashLen + 2)))
     {
         SMLOG_E("Error in VerifyRSASSA_PSS: invalid signature length\n");
         return 0;
@@ -2925,7 +2929,7 @@ int SE05XClass::VerifyRSASSA_PSS(int keyID, byte hash[], size_t hashLen, const b
         uint32_t startOfSalt = 0;
 
         for(uint32_t i = 0; i < dbLen; i++){
-            if(dec_data[i] == 0x01 && ((i+1) < dbLen)){
+            if(dec_data[i] == 0x01){ // && ((i+1) < dbLen)
                 startOfSalt = i+1;
                 break;
             }else if(dec_data[i] != 0x00){
