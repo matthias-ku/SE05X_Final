@@ -14,7 +14,7 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "..\t1oi2c\phNxpEseProto7816_3.h"
+#include "../t1oi2c/phNxpEseProto7816_3.h"
 
 
 /* ********************** Constants ********************** */
